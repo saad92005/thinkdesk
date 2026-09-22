@@ -23,6 +23,7 @@ services:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://thinkdesk:thinkdesk@postgres:5432/thinkdesk}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:

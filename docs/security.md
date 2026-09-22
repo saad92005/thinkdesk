@@ -22,6 +22,55 @@ under "Not yet implemented" instead of glossed over.
 - **Logout**: deletes the session row server-side (not just the cookie), so
   a stolen cookie from before logout stops working immediately.
 
+## Authorization / multi-tenancy (Step 6)
+
+- Every organization-scoped route depends on `get_organization_membership`
+  (`app/organizations/dependencies.py`), which checks membership **before**
+  any document, chunk, or conversation is looked up. A non-member gets 403
+  without the retrieval layer running at all.
+- Conversations are further scoped to the owning user (not just the org),
+  so one org member can't read another member's chat history by guessing a
+  conversation ID.
+- Verified by `backend/tests/test_tenant_isolation.py`: a second user is
+  rejected (403) from another org's members, documents, and search
+  endpoints; an unauthenticated request is rejected (401) before any org
+  check runs at all (so it can't be used to probe whether an org ID
+  exists).
+- Roles exist (`owner`/`admin`/`manager`/`member`/`viewer`) but nothing yet
+  *enforces* role-based restrictions beyond membership — e.g. a `viewer`
+  can currently upload documents just like an `owner` can. Role-gated
+  permissions per action are a Phase 8 (SaaS/RBAC) refinement, not yet
+  built.
+
+## Prompt injection / retrieved-content trust (Steps 13–15)
+
+- The chat system prompt (`app/chat/service.py::GROUNDED_SYSTEM_PROMPT`)
+  explicitly tells the model that context excerpts are untrusted document
+  content, not instructions, and to treat anything inside them that looks
+  like a command as text to quote/summarize, never obey.
+- Citations are built directly from the real retrieval results
+  (`SearchResultItem`), never parsed from the LLM's generated text — so a
+  citation always traces back to an actual chunk that was actually
+  retrieved, regardless of what the model claims to have used.
+- If no relevant chunks are found, the LLM is never called at all; the
+  response says so plainly instead of generating an ungrounded answer.
+- Not yet tested: an actual adversarial prompt-injection payload embedded
+  in an uploaded PDF. Worth adding once an LLM key is configured and this
+  can be exercised for real instead of just by prompt design.
+
+## File upload
+
+- PDF only (`Content-Type: application/pdf`), rejects other types with 415.
+- 20MB size limit, rejects empty files.
+- Stored on local disk under `backend/data/uploads/{organization_id}/`,
+  filename is `{document_id}.pdf` (not user-controlled) — no path traversal
+  surface from the original filename, which is stored separately as
+  metadata only.
+- **Not yet implemented**: virus/malware scanning of uploaded PDFs,
+  content-sniffing to confirm the bytes are actually a PDF (currently
+  trusts the client's declared `Content-Type`). Should land before
+  accepting uploads from untrusted users in production.
+
 ## Not yet implemented (intentionally deferred, not forgotten)
 
 - **Email verification** — accounts are usable immediately after signup.
@@ -29,18 +78,10 @@ under "Not yet implemented" instead of glossed over.
 - **Rate limiting / brute-force protection** on `/auth/login` — currently
   unlimited attempts. Should land before any public deployment.
 - **MFA**.
-- **Audit logging** of login/logout/signup events (Section 42 of the
-  project brief) — deferred until there's an audit log table and a reason
-  to query it.
-- **Multi-tenancy / authorization** — there is no organization model yet
-  (Step 6), so every authenticated user currently has equal, ungated access
-  to whatever endpoints exist. This is fine today because no tenant data
-  exists yet, but authorization must land *before* any document or
-  knowledge-base endpoint is added, per the project's core security rule:
-  the retrieval layer filters access, never the LLM.
-
-## Prompt injection / retrieved-content trust
-
-Not applicable yet — no RAG pipeline exists. When it's built (Phase 1
-milestone), retrieved document content must be treated as untrusted data,
-never as instructions (see the master project brief, Section 41).
+- **Audit logging** of login/logout/signup/document/chat events (Section 42
+  of the project brief) — deferred until there's an audit log table and a
+  reason to query it.
+- **Role-based permission enforcement** beyond plain membership (see above).
+- **Upload content scanning** (see above).
+- **Adversarial prompt-injection testing** against real uploaded content
+  (see above) — currently only defended by system-prompt design.

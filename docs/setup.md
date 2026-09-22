@@ -21,11 +21,20 @@ CREATE ROLE thinkdesk WITH LOGIN PASSWORD 'thinkdesk';
 CREATE DATABASE thinkdesk OWNER thinkdesk;
 ```
 
-> Note: the `pgvector` extension is **not** bundled with the plain Windows
-> installer. It isn't needed until the embeddings/retrieval milestone
-> (roadmap Steps 10–11) — we'll install it then (either by switching to
-> Docker if it becomes available, or building it from source against this
-> installation).
+> Note: `pgvector` isn't bundled with the plain Windows installer, but it
+> has been compiled from source (v0.8.0) against this install and is
+> vendored at `backend/vendor/pgvector-win64/` — see that folder's README
+> for the one remaining elevated install step. Until that's done, semantic
+> search uses a pure-Python cosine-similarity fallback (see
+> `docs/architecture.md`), which works correctly, just without a native
+> index.
+
+Also create the test database (used by `pytest`, kept separate from your
+working data):
+
+```sql
+CREATE DATABASE thinkdesk_test OWNER thinkdesk;
+```
 
 If the PostgreSQL Windows service (`postgresql-x64-16`) isn't running,
 start it from an elevated PowerShell or via `services.msc` — starting/
@@ -46,6 +55,39 @@ Check http://localhost:8000/health — with the database reachable it
 returns `"status": "ok", "database": "connected"`. If Postgres isn't
 running, it honestly reports `"status": "degraded", "database":
 "unreachable"` rather than assuming success.
+
+Apply database migrations before first run (and after pulling any change
+that touches `app/models/`):
+
+```
+alembic upgrade head
+```
+
+#### Enabling LLM chat generation
+
+Embeddings and retrieval work with no external account at all (they run
+locally via `fastembed`). Chat *generation* needs an LLM, though — get a
+free API key at https://console.groq.com and add it to `backend/.env`:
+
+```
+GROQ_API_KEY=your-key-here
+```
+
+Without it, `/chat` still runs the full retrieval + citation pipeline, but
+returns a plain "no LLM configured" message instead of a generated answer.
+
+#### Running tests
+
+```
+pip install -r requirements-dev.txt
+pytest -v
+```
+
+22 tests: chunking unit tests, auth security unit tests, the full signup/
+login/logout flow, tenant-isolation security tests, and a full upload →
+process → search → chat round trip against a real (but generated,
+throwaway) PDF. Tests run against `thinkdesk_test`, not your working
+database.
 
 ### 3. Frontend
 

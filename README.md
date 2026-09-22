@@ -14,9 +14,18 @@ pieces fit together.
 
 ## Current status
 
-**V0 — Engineering Foundation.** Frontend, backend, and database
-scaffolding exist and the backend exposes a real `/health` endpoint. No
-authentication, document upload, or RAG pipeline yet — that's next.
+**Phase 1 (V1) — AI Knowledge Assistant — functionally complete.** Signup
+→ login → create workspace → upload a PDF → it gets extracted, chunked,
+and embedded locally (no API key needed) → ask a question → get back
+retrieved, cited sources → chat history is saved. Full pytest suite (22
+tests) covers chunking, auth, and — the part that matters most for a
+multi-tenant app — that one organization's data is genuinely unreachable
+by another.
+
+Two known, honestly-documented gaps: LLM *answer generation* needs a free
+Groq API key (retrieval and citations work without one); `pgvector` is
+compiled and vendored but not yet installed (a Python fallback is used
+instead). See [docs/roadmap.md](docs/roadmap.md) for details.
 
 ## Stack
 
@@ -41,9 +50,13 @@ doc for details.
 
 ```
 thinkdesk/
-  frontend/    Next.js app
+  frontend/    Next.js app (auth pages, health/status widgets)
   backend/     FastAPI app
-  docs/        Architecture, setup, roadmap
+    app/       auth, organizations, documents, ai, retrieval, chat
+    migrations/  Alembic
+    tests/     pytest suite
+    vendor/    pgvector, compiled from source, pending install
+  docs/        Architecture, setup, roadmap, security
   docker-compose.yml
   .env.example
 ```

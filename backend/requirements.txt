@@ -9,3 +9,8 @@ alembic==1.14.0
 argon2-cffi==23.1.0
 email-validator==2.2.0
 psycopg2-binary==2.9.10
+python-multipart==0.0.20
+pypdf==5.1.0
+fastembed==0.4.2
+numpy==2.2.1
+openai==1.58.1

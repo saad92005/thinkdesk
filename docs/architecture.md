@@ -1,6 +1,6 @@
 # ThinkDesk Architecture
 
-## Current state (V0 + Step 5 — Authentication)
+## Current state (V1 — AI Knowledge Assistant)
 
 ```
 User
@@ -10,39 +10,91 @@ Next.js frontend (frontend/)
   |  fetch() with credentials: "include"
   v
 FastAPI backend (backend/)
-  |  app/auth/  -> app/models/ (User, Session)
+  |
+  |  app/auth/          -> User, Session
+  |  app/organizations/  -> Organization, OrganizationMember (RBAC)
+  |  app/documents/      -> Document  (upload, extraction, chunking)
+  |  app/ai/             -> EmbeddingProvider, LLMProvider (swappable)
+  |  app/retrieval/      -> DocumentChunk search (cosine similarity)
+  |  app/chat/           -> Conversation, Message (grounded generation + citations)
+  |
   |  SQLAlchemy (async) + asyncpg
   v
 PostgreSQL 16 (native local install)
 ```
 
-- **Frontend**: Next.js 15, App Router, TypeScript, Tailwind CSS. Renders the
-  homepage and calls the backend `/health` endpoint client-side to display
-  live, real status (never a hardcoded "all systems operational").
-  `/signup` and `/login` pages post credentials to the backend; `AuthStatus`
-  reads `/auth/me` to show the signed-in user or login/signup links.
-- **Backend**: FastAPI, layered as `api/` (route handlers) → `core/`
-  (configuration) → `database.py` (async SQLAlchemy engine + `Base` +
-  `get_db` dependency). Settings are loaded from environment variables via
-  `pydantic-settings`.
-- **Auth** (`app/auth/`): `security.py` (argon2id password hashing, session
-  token generation/hashing), `service.py` (signup/authenticate/session
-  business logic, independent of FastAPI), `dependencies.py`
-  (`get_current_user`, reads the session cookie), `router.py` (`/auth/signup`,
-  `/auth/login`, `/auth/logout`, `/auth/me`). See
-  [security.md](./security.md) for the specific choices and known gaps.
-- **Database**: PostgreSQL 16. This machine runs it as a native Windows
-  install (Docker isn't available here), so the `pgvector` extension is
-  **not yet installed** — it isn't needed until the embeddings/retrieval
-  milestone (roadmap Steps 10–11). The `docker-compose.yml` still targets
-  `pgvector/pgvector:pg16` for anyone running this project with Docker.
-  Schema changes go through Alembic migrations (`backend/migrations/`) —
-  never hand-edited.
+- **Frontend**: Next.js 15, App Router, TypeScript, Tailwind CSS. `/signup`
+  and `/login` pages; `AuthStatus`/`HealthStatus` widgets show real,
+  live-fetched state, never a hardcoded status.
+- **Backend layering**: `api/` or feature router → service layer (business
+  logic, no FastAPI types) → `database.py` (async SQLAlchemy engine +
+  `Base` + `get_db`). Settings via `pydantic-settings`.
 
-Nothing yet talks to an LLM or stores documents — those are later
-milestones (see [roadmap.md](./roadmap.md)). There is also no
-organization/workspace model yet, so authorization scoping (Step 6) isn't
-implemented; a logged-in user currently has no notion of a tenant.
+### Authorization boundary (the part that matters most)
+
+Every organization-scoped route depends on
+`get_organization_membership` (`app/organizations/dependencies.py`), which
+runs **before** any document, chunk, or conversation is fetched. A user who
+isn't a member of the organization gets a 403 without the retrieval layer
+ever running — the LLM is never in a position to leak cross-tenant data
+because the data is never fetched for it in the first place. This is
+covered by `backend/tests/test_tenant_isolation.py`, not just asserted in
+prose.
+
+### Document pipeline (Steps 7–11)
+
+```
+Upload (PDF, ≤20MB)
+  -> Document row (status=pending), saved to backend/data/uploads/{org_id}/{doc_id}.pdf
+  -> BackgroundTask: extract_pages (pypdf) -> chunk_pages (paragraph-aware,
+     page-tagged) -> embed (LocalEmbeddingProvider, fastembed, 384-dim,
+     no API key) -> DocumentChunk rows
+  -> status=ready (or failed, with error_message)
+```
+
+BackgroundTasks (FastAPI's built-in, in-process) are used instead of
+Celery/Redis — appropriate at V1's scale; if upload volume ever needs a
+real job queue, `process_document`'s body moves into a task with the same
+signature, and the API contract (upload now, poll `document.status`)
+doesn't change.
+
+### Retrieval (Steps 11–12)
+
+`app/retrieval/vector_store.py` fetches an organization's chunks (already
+filtered by `organization_id`, not trusted from the caller) and ranks them
+by cosine similarity in Python (`numpy`). This is a deliberate, documented
+simplification: `pgvector` v0.8.0 has been **compiled from source** against
+this machine's PostgreSQL 16 (using the VS Build Tools already installed)
+and is vendored at `backend/vendor/pgvector-win64/`, but installing it
+needs one elevated (admin) copy step this session can't perform — see that
+folder's README. Swapping to a native `vector` column + HNSW index changes
+`vector_store.py`'s internals only; `search()`'s signature and every
+caller stay the same.
+
+### Chat + citations (Steps 13–15)
+
+`app/chat/service.py` retrieves the top-k chunks for a query, and only
+calls the LLM if at least one chunk was found (never generates an
+ungrounded answer). The system prompt explicitly tells the model the
+context excerpts are untrusted document content, not instructions — see
+[security.md](./security.md#prompt-injection). **Citations are built
+directly from the retrieval results, not parsed out of the LLM's
+response** — so a citation always traces back to a real chunk, even if the
+model's phrasing is imprecise.
+
+LLM generation is behind an `LLMProvider` abstraction
+(`app/ai/llm.py`) currently implemented for Groq's free, OpenAI-compatible
+API. With no `GROQ_API_KEY` set, chat still runs end-to-end (retrieval,
+citations, conversation history) but returns a clear "no LLM configured"
+message instead of crashing or fabricating an answer.
+
+### Database
+
+PostgreSQL 16, native Windows install (Docker isn't available on this
+machine). Schema changes go through Alembic migrations
+(`backend/migrations/`) — never hand-edited. `docker-compose.yml` still
+targets `pgvector/pgvector:pg16` for anyone running this project with
+Docker instead.
 
 ## Target architecture (long-term)
 
@@ -77,12 +129,15 @@ API Layer -> Service Layer -> Repository/Data Layer
 ```
 
 Business logic does not live inside route handlers; route handlers call
-services, services call repositories/data access.
+services, services call repositories/data access. This is already the
+shape of `app/{auth,organizations,documents,retrieval,chat}/` — each has
+its own `service.py` with no FastAPI imports, tested independently of the
+HTTP layer where practical (`test_chunking.py`, `test_auth_security.py`).
 
 ## Multi-tenancy
 
-ThinkDesk is a multi-tenant SaaS. Every table that stores customer data will
-carry an `organization_id`, and authorization is enforced in the retrieval
-layer — before any data reaches an LLM — not left to the model to decide.
-This is not yet implemented in V0; it lands with the organizations/workspace
-milestone (Step 6).
+Every table holding customer data (`Document`, `DocumentChunk`,
+`Conversation`, `Message`) carries an `organization_id`, and authorization
+is enforced before retrieval — not left to the model to decide. See
+"Authorization boundary" above; this is implemented, not aspirational, as
+of Step 6.
