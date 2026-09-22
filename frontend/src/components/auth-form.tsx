@@ -21,7 +21,7 @@ export function AuthForm({ mode }: { mode: "signup" | "login" }) {
       } else {
         await login(email, password);
       }
-      router.push("/");
+      router.push("/app");
       router.refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong");

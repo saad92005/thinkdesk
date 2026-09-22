@@ -46,6 +46,9 @@ export function AuthStatus() {
       <span className="text-neutral-600 dark:text-neutral-300">
         Signed in as {state.user.email}
       </span>
+      <Link href="/app" className="text-neutral-700 underline dark:text-neutral-300">
+        Open workspace
+      </Link>
       <button
         onClick={async () => {
           await logout();
