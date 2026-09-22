@@ -1,3 +1,4 @@
+import { AuthStatus } from "@/components/auth-status";
 import { HealthStatus } from "@/components/health-status";
 
 export default function Home() {
@@ -11,6 +12,7 @@ export default function Home() {
           Your knowledge. Your AI workspace.
         </p>
       </div>
+      <AuthStatus />
       <HealthStatus />
     </main>
   );

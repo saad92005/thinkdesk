@@ -17,9 +17,21 @@ class Settings(BaseSettings):
     # Comma-separated list of allowed frontend origins for CORS.
     cors_origins: str = "http://localhost:3000"
 
+    session_cookie_name: str = "thinkdesk_session"
+    session_ttl_days: int = 7
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def database_url_sync(self) -> str:
+        """Sync driver URL for Alembic, which doesn't need asyncpg."""
+        return self.database_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+
+    @property
+    def cookie_secure(self) -> bool:
+        return self.environment != "development"
 
 
 @lru_cache

@@ -11,7 +11,7 @@ should work and be verified before the next begins.
 | 2 | Next.js frontend | ✅ Done |
 | 3 | FastAPI backend | ✅ Done |
 | 4 | PostgreSQL | ✅ Running locally (native install); `pgvector` deferred to Step 10–11 |
-| 5 | Authentication | ⬜ Not started |
+| 5 | Authentication | ✅ Done (email/password, argon2id, server-side sessions) |
 | 6 | Organizations / workspaces | ⬜ Not started |
 | 7 | PDF upload | ⬜ Not started |
 | 8 | Document processing | ⬜ Not started |
@@ -56,6 +56,7 @@ RBAC, usage tracking, plans/billing, analytics, public API.
 
 ---
 
-**Current focus:** V0 is verified end-to-end (frontend, backend, and a
-native local PostgreSQL all confirmed working via `/health`). Next up:
-Step 5 (Authentication).
+**Current focus:** Authentication (Step 5) is done and verified end-to-end
+in a real browser (signup, login, logout, session persistence). Next up:
+Step 6 (Organizations / workspaces) — needed before any document or chat
+feature, since every future table is scoped to an organization.
