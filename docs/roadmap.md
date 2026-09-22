@@ -10,7 +10,7 @@ should work and be verified before the next begins.
 | 1 | Project initialization | ✅ Done |
 | 2 | Next.js frontend | ✅ Done |
 | 3 | FastAPI backend | ✅ Done |
-| 4 | PostgreSQL (+ pgvector) | ✅ Compose config in place, not yet running |
+| 4 | PostgreSQL | ✅ Running locally (native install); `pgvector` deferred to Step 10–11 |
 | 5 | Authentication | ⬜ Not started |
 | 6 | Organizations / workspaces | ⬜ Not started |
 | 7 | PDF upload | ⬜ Not started |
@@ -56,5 +56,6 @@ RBAC, usage tracking, plans/billing, analytics, public API.
 
 ---
 
-**Current focus:** finish verifying V0 end-to-end (frontend, backend,
-database via Docker), then move to Step 5 (Authentication).
+**Current focus:** V0 is verified end-to-end (frontend, backend, and a
+native local PostgreSQL all confirmed working via `/health`). Next up:
+Step 5 (Authentication).

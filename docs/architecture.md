@@ -12,7 +12,7 @@ Next.js frontend (frontend/)
 FastAPI backend (backend/)
   |  SQLAlchemy (async) + asyncpg
   v
-PostgreSQL + pgvector (docker-compose)
+PostgreSQL 16 (native local install)
 ```
 
 - **Frontend**: Next.js 15, App Router, TypeScript, Tailwind CSS. Renders the
@@ -21,9 +21,11 @@ PostgreSQL + pgvector (docker-compose)
 - **Backend**: FastAPI, layered as `api/` (route handlers) → `core/`
   (configuration) → `database.py` (async SQLAlchemy engine). Settings are
   loaded from environment variables via `pydantic-settings`.
-- **Database**: PostgreSQL with the `pgvector` extension image
-  (`pgvector/pgvector:pg16`), chosen now so the schema and vector columns can
-  be introduced later without swapping the underlying image.
+- **Database**: PostgreSQL 16. This machine runs it as a native Windows
+  install (Docker isn't available here), so the `pgvector` extension is
+  **not yet installed** — it isn't needed until the embeddings/retrieval
+  milestone (roadmap Steps 10–11). The `docker-compose.yml` still targets
+  `pgvector/pgvector:pg16` for anyone running this project with Docker.
 
 Nothing in V0 talks to an LLM, stores documents, or implements
 authentication yet — those are later milestones (see
