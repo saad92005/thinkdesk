@@ -14,6 +14,7 @@ from app.auth.service import (
 from app.core.config import get_settings
 from app.database import get_db
 from app.models.user import User
+from app.organizations.service import create_organization
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 settings = get_settings()
@@ -37,6 +38,9 @@ async def signup_route(payload: SignupRequest, response: Response, db: AsyncSess
         user = await signup(db, payload.email, payload.password)
     except EmailAlreadyRegisteredError:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+
+    workspace_name = f"{payload.email.split('@')[0]}'s Workspace"
+    await create_organization(db, workspace_name, user)
 
     token = await create_session(db, user)
     _set_session_cookie(response, token)
