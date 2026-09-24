@@ -2,6 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import ReactMarkdown from "react-markdown";
 import { OrgNav } from "@/components/org-nav";
 import {
   ApiError,
@@ -144,10 +145,14 @@ export default function ChatPage() {
                   className={
                     message.role === "user"
                       ? "rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900"
-                      : "rounded-lg border border-neutral-200 px-4 py-2 text-sm text-neutral-900 dark:border-neutral-800 dark:text-neutral-100"
+                      : "rounded-lg border border-neutral-200 px-4 py-2 text-sm text-neutral-900 [&_ol]:list-decimal [&_ol]:pl-5 [&_p+p]:mt-2 [&_ul]:list-disc [&_ul]:pl-5 dark:border-neutral-800 dark:text-neutral-100"
                   }
                 >
-                  {message.content}
+                  {message.role === "assistant" ? (
+                    <ReactMarkdown>{message.content}</ReactMarkdown>
+                  ) : (
+                    message.content
+                  )}
                 </div>
                 {message.citations && message.citations.length > 0 && (
                   <div className="mt-2 flex flex-col gap-1">

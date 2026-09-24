@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.llm import LLMNotConfiguredError, get_llm_provider
+from app.ai.llm import LLMGenerationError, LLMNotConfiguredError, get_llm_provider
 from app.models.message import Conversation, Message, MessageRole
 from app.models.user import User
 from app.retrieval.schemas import SearchResultItem
@@ -74,6 +74,8 @@ async def send_message(
             answer = provider.generate(GROUNDED_SYSTEM_PROMPT, _build_user_prompt(message_text, results))
         except LLMNotConfiguredError as exc:
             answer = f"I found relevant context, but no LLM is configured to generate an answer yet ({exc})"
+        except LLMGenerationError as exc:
+            answer = f"I found relevant context, but the AI provider couldn't generate an answer right now ({exc})"
 
         # Citations always come from the real retrieval results, never
         # parsed out of what the LLM claims to have used -- grounding the

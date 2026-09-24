@@ -14,20 +14,20 @@ pieces fit together.
 
 ## Current status
 
-**Phase 1 (V1) — AI Knowledge Assistant — functionally complete.** Signup
-→ login → create workspace → upload a PDF → it gets extracted, chunked,
-and embedded locally (no API key needed) → ask a question → get back
-retrieved, cited sources → chat history is saved and browsable across
-past conversations. Retrieval is hybrid (vector + BM25 keyword search,
-fused with Reciprocal Rank Fusion — Phase 2, Step 17). Full pytest suite
-(27 tests) covers chunking, auth, hybrid search ranking, and — the part
-that matters most for a multi-tenant app — that one organization's data
-is genuinely unreachable by another.
+**Phase 1 (V1) — AI Knowledge Assistant — functionally complete**, plus
+hybrid search (Phase 2, Step 17). Signup → login → create workspace →
+upload a PDF → it gets extracted, chunked, and embedded locally (no API
+key needed) → ask a question → retrieval fuses vector + BM25 keyword
+search (Reciprocal Rank Fusion) → Groq generates a real grounded answer
+with citations → chat history is saved and browsable across past
+conversations. Full pytest suite (27 tests) covers chunking, auth, hybrid
+search ranking, and — the part that matters most for a multi-tenant app —
+that one organization's data is genuinely unreachable by another.
 
-Two known, honestly-documented gaps: LLM *answer generation* needs a free
-Groq API key (retrieval and citations work without one); `pgvector` is
-compiled and vendored but not yet installed (a Python fallback is used
-instead). See [docs/roadmap.md](docs/roadmap.md) for details.
+One known, honestly-documented gap: `pgvector` is compiled and vendored
+but not yet installed into the running Postgres instance (needs one
+elevated copy step; a Python fallback is used instead — see
+[docs/roadmap.md](docs/roadmap.md) for details).
 
 ## Stack
 

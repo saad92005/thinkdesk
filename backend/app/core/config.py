@@ -26,9 +26,13 @@ class Settings(BaseSettings):
 
     # Free-tier LLM via Groq's OpenAI-compatible API (https://console.groq.com).
     # Left unset until the user provides one; chat/generation degrades to a
-    # clear error instead of crashing when it's missing.
+    # clear error instead of crashing when it's missing. Groq's hosted model
+    # lineup changes over time (older llama-3.x models have been retired for
+    # some accounts) -- override with GROQ_MODEL in .env if this default
+    # ever stops being available; `GET /openai/v1/models` against Groq's API
+    # with your key lists what's currently servable.
     groq_api_key: str | None = None
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-120b"
 
     @property
     def cors_origin_list(self) -> list[str]:

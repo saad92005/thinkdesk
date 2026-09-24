@@ -19,7 +19,7 @@ should work and be verified before the next begins.
 | 10 | Embeddings | ✅ Done (local, free — `fastembed`/BAAI/bge-small-en-v1.5, no API key) |
 | 11 | pgvector indexing | ⚠️ Fallback in place (Python cosine similarity); native pgvector compiled and vendored, pending one elevated install step |
 | 12 | Semantic retrieval | ✅ Done (`POST /organizations/{id}/search`), upgraded to hybrid (see Phase 2) |
-| 13 | LLM generation | ⚠️ Wired up (Groq, OpenAI-compatible), but **no API key configured** — degrades to a clear message instead of crashing or fabricating an answer |
+| 13 | LLM generation | ✅ Done — Groq (`openai/gpt-oss-120b`, OpenAI-compatible API) generating real grounded answers with a configured `GROQ_API_KEY`; still degrades to a clear message (not a crash) if the key is ever missing or the provider call fails |
 | 14 | Citations | ✅ Done (always built from real retrieval results, never parsed from LLM output) |
 | 15 | Chat history | ✅ Done (conversations + messages, scoped to org and owning user; frontend has a sidebar to list past conversations and switch between them) |
 | 16 | Testing | ✅ Done (27 pytest tests: chunking, auth security, auth flow, tenant isolation, hybrid search ranking, full upload→search→chat round trip) |
@@ -67,19 +67,19 @@ provider (e.g. Stripe) account before it can be wired up for real.
 
 ---
 
-**Current focus:** V1 (Phase 1) is functionally complete and tested
-end-to-end, with two known, clearly-flagged gaps: (1) `pgvector` needs one
-elevated copy command to finish installing — see
-`backend/vendor/pgvector-win64/README.md`; (2) LLM answer generation needs
-a free Groq API key in `backend/.env` (`GROQ_API_KEY=...`) — get one at
-https://console.groq.com. Everything else in the pipeline (upload,
-processing, chunking, embeddings, retrieval, citations, chat history) is
-real and verified, not stubbed.
+**Current focus:** V1 (Phase 1) plus hybrid search (Phase 2, Step 17) are
+functionally complete and tested end-to-end, including real LLM-generated
+answers (Groq `openai/gpt-oss-120b`) verified live in a real browser
+session — not just retrieval/citations. One known, clearly-flagged gap
+remains: `pgvector` needs one elevated copy command to finish installing
+— see `backend/vendor/pgvector-win64/README.md`; the Python cosine + BM25
+fallback is correct in the meantime, just not indexed/scaled.
 
 Next up: reranking and query rewriting (Phase 2, Steps 18–19) don't need
-new credentials either and can proceed; a real RAG evaluation framework
-(Step 20) needs an LLM key to be meaningful. Phases 5–7 (agents with real
-external tools, automation on real external services, integrations) need
-credentials/accounts this session cannot create — those should be scoped
-with the project owner before implementation starts, per the master
-brief's own rule against building ahead of what can actually be verified.
+new credentials and can proceed; a real RAG evaluation framework (Step 20)
+now has an LLM key available to score answer quality against. Phases 5–7
+(agents with real external tools, automation on real external services,
+integrations) need credentials/accounts this session cannot create —
+those should be scoped with the project owner before implementation
+starts, per the master brief's own rule against building ahead of what
+can actually be verified.

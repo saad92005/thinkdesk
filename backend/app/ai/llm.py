@@ -11,6 +11,13 @@ class LLMNotConfiguredError(Exception):
     user-facing error rather than a stack trace or a fabricated answer."""
 
 
+class LLMGenerationError(Exception):
+    """Raised when a configured provider's API call itself fails (bad
+    model name, rate limit, network issue, ...). Distinct from
+    LLMNotConfiguredError so callers can give an equally honest message
+    without conflating 'not set up' with 'set up but the call failed'."""
+
+
 class LLMProvider(ABC):
     @abstractmethod
     def generate(self, system_prompt: str, user_prompt: str) -> str: ...
@@ -29,14 +36,19 @@ class GroqProvider(LLMProvider):
         self._model = model
 
     def generate(self, system_prompt: str, user_prompt: str) -> str:
-        response = self._client.chat.completions.create(
-            model=self._model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.2,
-        )
+        from openai import APIError
+
+        try:
+            response = self._client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.2,
+            )
+        except APIError as exc:
+            raise LLMGenerationError(str(exc)) from exc
         return response.choices[0].message.content or ""
 
 

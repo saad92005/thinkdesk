@@ -94,9 +94,13 @@ model's phrasing is imprecise.
 
 LLM generation is behind an `LLMProvider` abstraction
 (`app/ai/llm.py`) currently implemented for Groq's free, OpenAI-compatible
-API. With no `GROQ_API_KEY` set, chat still runs end-to-end (retrieval,
-citations, conversation history) but returns a clear "no LLM configured"
-message instead of crashing or fabricating an answer.
+API (`openai/gpt-oss-120b` by default — Groq's hosted lineup changes over
+time, override with `GROQ_MODEL` if this one is ever retired). With no
+`GROQ_API_KEY` set, or if the provider call itself fails (bad model name,
+rate limit, network issue), chat still runs end-to-end (retrieval,
+citations, conversation history) but returns a clear error message
+(`LLMNotConfiguredError` / `LLMGenerationError`) instead of crashing or
+fabricating an answer.
 
 ### Database
 
