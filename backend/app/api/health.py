@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from app.database import check_database_connection
 
-router = APIRouter()
+router = APIRouter(tags=["health"])
 
 
 class HealthResponse(BaseModel):

@@ -13,8 +13,14 @@ settings = get_settings()
 
 app = FastAPI(
     title="ThinkDesk API",
-    description="Your knowledge. Your AI workspace.",
-    version="0.1.0",
+    description=(
+        "AI knowledge workspace API: multi-tenant document ingestion, hybrid "
+        "(vector + BM25) retrieval, and grounded chat with real citations. "
+        "Authorization is enforced at the organization-membership layer "
+        "before any document or chunk is ever read."
+    ),
+    version="0.2.0",
+    contact={"name": "ThinkDesk"},
 )
 
 app.add_middleware(
