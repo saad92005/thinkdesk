@@ -168,6 +168,21 @@ export async function sendChatMessage(
   return response.json();
 }
 
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  created_at: string;
+}
+
+export async function listConversations(orgId: string): Promise<ConversationSummary[]> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/conversations`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
 export async function getConversationMessages(orgId: string, conversationId: string): Promise<ChatMessage[]> {
   const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/conversations/${conversationId}/messages`, {
     credentials: "include",

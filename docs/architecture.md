@@ -58,7 +58,7 @@ real job queue, `process_document`'s body moves into a task with the same
 signature, and the API contract (upload now, poll `document.status`)
 doesn't change.
 
-### Retrieval (Steps 11–12)
+### Retrieval (Steps 11–12, hybrid search Step 17)
 
 `app/retrieval/vector_store.py` fetches an organization's chunks (already
 filtered by `organization_id`, not trusted from the caller) and ranks them
@@ -70,6 +70,16 @@ needs one elevated (admin) copy step this session can't perform — see that
 folder's README. Swapping to a native `vector` column + HNSW index changes
 `vector_store.py`'s internals only; `search()`'s signature and every
 caller stay the same.
+
+Retrieval is **hybrid**, not vector-only: `hybrid_search()` runs the
+cosine-similarity ranking above alongside a BM25 keyword ranking
+(`rank_bm25`) over the same org-scoped chunks, then combines the two
+rankings with Reciprocal Rank Fusion (by rank position, not raw score,
+since BM25 and cosine scores aren't on comparable scales). This catches
+exact terms — names, codes, numbers — that a semantic embedding can blur
+together, without giving up semantic matching for paraphrased questions.
+Both `/search` and `/chat` go through `search()` in
+`app/retrieval/service.py`, so both benefit automatically.
 
 ### Chat + citations (Steps 13–15)
 

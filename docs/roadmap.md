@@ -18,16 +18,20 @@ should work and be verified before the next begins.
 | 9 | Chunking | ✅ Done (paragraph-aware, page-tagged, configurable size/overlap) |
 | 10 | Embeddings | ✅ Done (local, free — `fastembed`/BAAI/bge-small-en-v1.5, no API key) |
 | 11 | pgvector indexing | ⚠️ Fallback in place (Python cosine similarity); native pgvector compiled and vendored, pending one elevated install step |
-| 12 | Semantic retrieval | ✅ Done (`POST /organizations/{id}/search`) |
+| 12 | Semantic retrieval | ✅ Done (`POST /organizations/{id}/search`), upgraded to hybrid (see Phase 2) |
 | 13 | LLM generation | ⚠️ Wired up (Groq, OpenAI-compatible), but **no API key configured** — degrades to a clear message instead of crashing or fabricating an answer |
 | 14 | Citations | ✅ Done (always built from real retrieval results, never parsed from LLM output) |
-| 15 | Chat history | ✅ Done (conversations + messages, scoped to org and owning user) |
-| 16 | Testing | ✅ Done (22 pytest tests: chunking, auth security, auth flow, tenant isolation, full upload→search→chat round trip) |
+| 15 | Chat history | ✅ Done (conversations + messages, scoped to org and owning user; frontend has a sidebar to list past conversations and switch between them) |
+| 16 | Testing | ✅ Done (27 pytest tests: chunking, auth security, auth flow, tenant isolation, hybrid search ranking, full upload→search→chat round trip) |
 
 ## Phase 2 — Advanced RAG
 
-Hybrid search (BM25 + semantic), reranking, query rewriting, evaluation
-framework (Steps 17–20). Not started.
+| Step | Milestone | Status |
+|------|-----------|--------|
+| 17 | Hybrid search | ✅ Done — BM25 keyword ranking (`rank_bm25`) fused with vector cosine similarity via Reciprocal Rank Fusion (`app/retrieval/vector_store.py::hybrid_search`); used by both `/search` and `/chat` automatically |
+| 18 | Reranking | Not started |
+| 19 | Query rewriting | Not started |
+| 20 | RAG evaluation framework | Not started — needs a real LLM key to meaningfully score answer quality |
 
 ## Phase 3 — Document Intelligence
 
@@ -72,10 +76,10 @@ https://console.groq.com. Everything else in the pipeline (upload,
 processing, chunking, embeddings, retrieval, citations, chat history) is
 real and verified, not stubbed.
 
-Next up: Phase 2 (hybrid search, reranking, query rewriting, evaluation)
-is the natural next step once an LLM key is available to meaningfully
-evaluate answer quality. Phases 5–7 (agents with real external tools,
-automation on real external services, integrations) need credentials/
-accounts this session cannot create — those should be scoped with the
-project owner before implementation starts, per the master brief's own
-rule against building ahead of what can actually be verified.
+Next up: reranking and query rewriting (Phase 2, Steps 18–19) don't need
+new credentials either and can proceed; a real RAG evaluation framework
+(Step 20) needs an LLM key to be meaningful. Phases 5–7 (agents with real
+external tools, automation on real external services, integrations) need
+credentials/accounts this session cannot create — those should be scoped
+with the project owner before implementation starts, per the master
+brief's own rule against building ahead of what can actually be verified.

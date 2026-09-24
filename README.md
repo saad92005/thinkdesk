@@ -17,10 +17,12 @@ pieces fit together.
 **Phase 1 (V1) — AI Knowledge Assistant — functionally complete.** Signup
 → login → create workspace → upload a PDF → it gets extracted, chunked,
 and embedded locally (no API key needed) → ask a question → get back
-retrieved, cited sources → chat history is saved. Full pytest suite (22
-tests) covers chunking, auth, and — the part that matters most for a
-multi-tenant app — that one organization's data is genuinely unreachable
-by another.
+retrieved, cited sources → chat history is saved and browsable across
+past conversations. Retrieval is hybrid (vector + BM25 keyword search,
+fused with Reciprocal Rank Fusion — Phase 2, Step 17). Full pytest suite
+(27 tests) covers chunking, auth, hybrid search ranking, and — the part
+that matters most for a multi-tenant app — that one organization's data
+is genuinely unreachable by another.
 
 Two known, honestly-documented gaps: LLM *answer generation* needs a free
 Groq API key (retrieval and citations work without one); `pgvector` is
