@@ -18,11 +18,13 @@ pieces fit together.
 hybrid search (Phase 2, Step 17). Signup → login → create workspace →
 upload a PDF → it gets extracted, chunked, and embedded locally (no API
 key needed) → ask a question → retrieval fuses vector + BM25 keyword
-search (Reciprocal Rank Fusion) → Groq generates a real grounded answer
-with citations → chat history is saved and browsable across past
-conversations. Full pytest suite (27 tests) covers chunking, auth, hybrid
-search ranking, and — the part that matters most for a multi-tenant app —
-that one organization's data is genuinely unreachable by another.
+search (Reciprocal Rank Fusion), then reranks with a local cross-encoder
+→ Groq generates a real grounded answer with citations → chat history is
+saved and browsable across past conversations. Invite teammates (if they
+already have an account) and manage roles per workspace. Full pytest
+suite (36 tests) covers chunking, auth, hybrid search + reranking, and —
+the part that matters most for a multi-tenant app — that one
+organization's data is genuinely unreachable by another.
 
 One known, honestly-documented gap: `pgvector` is compiled and vendored
 but not yet installed into the running Postgres instance (needs one

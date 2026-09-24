@@ -22,16 +22,18 @@ should work and be verified before the next begins.
 | 13 | LLM generation | ✅ Done — Groq (`openai/gpt-oss-120b`, OpenAI-compatible API) generating real grounded answers with a configured `GROQ_API_KEY`; still degrades to a clear message (not a crash) if the key is ever missing or the provider call fails |
 | 14 | Citations | ✅ Done (always built from real retrieval results, never parsed from LLM output) |
 | 15 | Chat history | ✅ Done (conversations + messages, scoped to org and owning user; frontend has a sidebar to list past conversations and switch between them) |
-| 16 | Testing | ✅ Done (27 pytest tests: chunking, auth security, auth flow, tenant isolation, hybrid search ranking, full upload→search→chat round trip) |
+| 16 | Testing | ✅ Done (36 pytest tests: chunking, auth security, auth flow, tenant isolation, hybrid search ranking, reranking, document delete, member invites, full upload→search→chat round trip) |
+
+Also since V1: **document deletion** (`DELETE /organizations/{id}/documents/{id}`) and **team invites** (`POST /organizations/{id}/members`, owner/admin-only, honestly limited to inviting people who already have an account — no email provider is configured) were added as real CRUD/collaboration gaps, plus a light/dark/system **theme toggle** in the UI.
 
 ## Phase 2 — Advanced RAG
 
 | Step | Milestone | Status |
 |------|-----------|--------|
 | 17 | Hybrid search | ✅ Done — BM25 keyword ranking (`rank_bm25`) fused with vector cosine similarity via Reciprocal Rank Fusion (`app/retrieval/vector_store.py::hybrid_search`); used by both `/search` and `/chat` automatically |
-| 18 | Reranking | Not started |
+| 18 | Reranking | ✅ Done — local cross-encoder (fastembed, `Xenova/ms-marco-MiniLM-L-6-v2`, free/no API key) re-scores a widened hybrid-search candidate pool (`app/ai/reranker.py`, wired into `app/retrieval/service.py`) |
 | 19 | Query rewriting | Not started |
-| 20 | RAG evaluation framework | Not started — needs a real LLM key to meaningfully score answer quality |
+| 20 | RAG evaluation framework | Not started — an LLM key is now configured, so this is unblocked whenever it's prioritized |
 
 ## Phase 3 — Document Intelligence
 
@@ -67,19 +69,20 @@ provider (e.g. Stripe) account before it can be wired up for real.
 
 ---
 
-**Current focus:** V1 (Phase 1) plus hybrid search (Phase 2, Step 17) are
-functionally complete and tested end-to-end, including real LLM-generated
-answers (Groq `openai/gpt-oss-120b`) verified live in a real browser
-session — not just retrieval/citations. One known, clearly-flagged gap
-remains: `pgvector` needs one elevated copy command to finish installing
-— see `backend/vendor/pgvector-win64/README.md`; the Python cosine + BM25
-fallback is correct in the meantime, just not indexed/scaled.
+**Current focus:** V1 (Phase 1) plus hybrid search + reranking (Phase 2,
+Steps 17–18) are functionally complete and tested end-to-end, including
+real LLM-generated answers (Groq `openai/gpt-oss-120b`) verified live in a
+real browser session — not just retrieval/citations. One known,
+clearly-flagged gap remains: `pgvector` needs one elevated copy command to
+finish installing — see `backend/vendor/pgvector-win64/README.md`; the
+Python cosine + BM25 + reranking pipeline is correct in the meantime, just
+not indexed/scaled.
 
-Next up: reranking and query rewriting (Phase 2, Steps 18–19) don't need
-new credentials and can proceed; a real RAG evaluation framework (Step 20)
-now has an LLM key available to score answer quality against. Phases 5–7
-(agents with real external tools, automation on real external services,
-integrations) need credentials/accounts this session cannot create —
-those should be scoped with the project owner before implementation
-starts, per the master brief's own rule against building ahead of what
-can actually be verified.
+Next up: query rewriting (Phase 2, Step 19) doesn't need new credentials
+and can proceed; a real RAG evaluation framework (Step 20) now has an LLM
+key available to score answer quality against. Phases 5–7 (agents with
+real external tools, automation on real external services, integrations)
+need credentials/accounts this session cannot create — those should be
+scoped with the project owner before implementation starts, per the
+master brief's own rule against building ahead of what can actually be
+verified.

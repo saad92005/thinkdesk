@@ -58,7 +58,7 @@ real job queue, `process_document`'s body moves into a task with the same
 signature, and the API contract (upload now, poll `document.status`)
 doesn't change.
 
-### Retrieval (Steps 11–12, hybrid search Step 17)
+### Retrieval (Steps 11–12, hybrid search Step 17, reranking Step 18)
 
 `app/retrieval/vector_store.py` fetches an organization's chunks (already
 filtered by `organization_id`, not trusted from the caller) and ranks them
@@ -80,6 +80,16 @@ exact terms — names, codes, numbers — that a semantic embedding can blur
 together, without giving up semantic matching for paraphrased questions.
 Both `/search` and `/chat` go through `search()` in
 `app/retrieval/service.py`, so both benefit automatically.
+
+`search()` then **reranks**: it asks `hybrid_search()` for a wider
+candidate pool (`top_k * 4`, capped at 25 -- free, since hybrid search
+already scores every org chunk internally before truncating) and re-scores
+that shortlist with a local cross-encoder (`app/ai/reranker.py`, fastembed
+`Xenova/ms-marco-MiniLM-L-6-v2`, ~80MB, no API key). A cross-encoder scores
+the query and a candidate jointly, which is more precise than comparing
+two independently-computed embeddings, but too slow to run over an entire
+corpus -- which is exactly why it only touches the shortlist, not every
+chunk.
 
 ### Chat + citations (Steps 13–15)
 
