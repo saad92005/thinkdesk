@@ -7,7 +7,7 @@ from app.ai.embeddings import get_embedding_provider
 from app.database import async_session_factory
 from app.documents.chunking import chunk_pages
 from app.documents.extraction import extract_pages
-from app.documents.storage import save_upload
+from app.documents.storage import delete_upload, save_upload
 from app.models.chunk import DocumentChunk
 from app.models.document import Document, DocumentStatus
 from app.models.user import User
@@ -68,6 +68,21 @@ async def get_document(db: AsyncSession, organization_id: uuid.UUID, document_id
     return await db.scalar(
         select(Document).where(Document.id == document_id, Document.organization_id == organization_id)
     )
+
+
+async def delete_document(db: AsyncSession, organization_id: uuid.UUID, document_id: uuid.UUID) -> bool:
+    """Deletes the document row (its chunks cascade via the FK's
+    ON DELETE CASCADE) and its file on disk. Returns False if the document
+    doesn't exist in this organization, so the caller can 404 rather than
+    silently succeeding on someone else's document."""
+    document = await get_document(db, organization_id, document_id)
+    if document is None:
+        return False
+
+    delete_upload(document.storage_path)
+    await db.delete(document)
+    await db.commit()
+    return True
 
 
 async def process_document(document_id: uuid.UUID) -> None:

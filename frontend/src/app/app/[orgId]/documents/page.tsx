@@ -2,13 +2,13 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FileText, Upload } from "lucide-react";
+import { FileText, Trash2, Upload } from "lucide-react";
 import { OrgNav } from "@/components/org-nav";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { PageSpinner } from "@/components/ui/spinner";
-import { ApiError, listDocuments, uploadDocument, type DocumentItem } from "@/lib/api";
+import { ApiError, deleteDocument, listDocuments, uploadDocument, type DocumentItem } from "@/lib/api";
 import { useOrganization } from "@/lib/useOrganization";
 
 const STATUS_TONE: Record<DocumentItem["status"], "neutral" | "warning" | "success" | "danger"> = {
@@ -31,6 +31,7 @@ export default function DocumentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(() => {
@@ -65,6 +66,20 @@ export default function DocumentsPage() {
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleDelete(doc: DocumentItem) {
+    if (!window.confirm(`Delete "${doc.filename}"? This can't be undone.`)) return;
+    setError(null);
+    setDeletingId(doc.id);
+    try {
+      await deleteDocument(orgId, doc.id);
+      setDocuments((prev) => (prev ?? []).filter((d) => d.id !== doc.id));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Delete failed");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -145,7 +160,17 @@ export default function DocumentsPage() {
                       {doc.error_message && <p className="mt-0.5 text-xs text-red-500">{doc.error_message}</p>}
                     </div>
                   </div>
-                  <Badge tone={STATUS_TONE[doc.status]}>{doc.status}</Badge>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <Badge tone={STATUS_TONE[doc.status]}>{doc.status}</Badge>
+                    <button
+                      onClick={() => handleDelete(doc)}
+                      disabled={deletingId === doc.id}
+                      aria-label={`Delete ${doc.filename}`}
+                      className="text-muted transition-colors hover:text-red-500 disabled:opacity-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </Card>
               </li>
             ))}

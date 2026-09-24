@@ -16,3 +16,7 @@ def save_upload(organization_id: uuid.UUID, document_id: uuid.UUID, content: byt
     path = _upload_dir(organization_id) / f"{document_id}.pdf"
     path.write_bytes(content)
     return str(path)
+
+
+def delete_upload(storage_path: str) -> None:
+    Path(storage_path).unlink(missing_ok=True)

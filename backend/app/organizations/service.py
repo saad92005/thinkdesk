@@ -55,3 +55,31 @@ async def list_members(db: AsyncSession, organization_id: uuid.UUID) -> list[tup
         .order_by(OrganizationMember.created_at)
     )
     return [(member, user) for member, user in result.all()]
+
+
+class UserNotFoundError(Exception):
+    """No account exists with the given email. There's no email-sending
+    infrastructure (Phase 7, blocked on real provider credentials), so
+    invites only work for people who already have a ThinkDesk account --
+    an honest limitation, not a silently broken invite flow."""
+
+
+class AlreadyMemberError(Exception):
+    pass
+
+
+async def add_member(
+    db: AsyncSession, organization_id: uuid.UUID, email: str, role: OrganizationRole
+) -> tuple[OrganizationMember, User]:
+    user = await db.scalar(select(User).where(User.email == email))
+    if user is None:
+        raise UserNotFoundError(email)
+
+    if await get_membership(db, organization_id, user.id) is not None:
+        raise AlreadyMemberError(email)
+
+    member = OrganizationMember(organization_id=organization_id, user_id=user.id, role=role)
+    db.add(member)
+    await db.commit()
+    await db.refresh(member)
+    return member, user

@@ -11,6 +11,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Logo } from "@/components/ui/logo";
 import { PageSpinner } from "@/components/ui/spinner";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 
 export default function WorkspacesPage() {
@@ -62,7 +63,10 @@ export default function WorkspacesPage() {
         <Link href="/app">
           <Logo />
         </Link>
-        <UserMenu />
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+          <UserMenu />
+        </div>
       </header>
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-12">

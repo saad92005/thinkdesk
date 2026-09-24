@@ -10,6 +10,7 @@ from app.documents.service import (
     InvalidFileError,
     UnsupportedFileTypeError,
     create_document,
+    delete_document,
     get_document,
     list_documents,
     process_document,
@@ -64,3 +65,15 @@ async def get_document_route(
     if document is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found")
     return document  # type: ignore[return-value]
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_document_route(
+    organization_id: uuid.UUID,
+    document_id: uuid.UUID,
+    membership: OrganizationMember = Depends(get_organization_membership),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    deleted = await delete_document(db, organization_id, document_id)
+    if not deleted:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Document not found")

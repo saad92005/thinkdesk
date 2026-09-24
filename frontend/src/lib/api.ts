@@ -132,6 +132,43 @@ export async function uploadDocument(orgId: string, file: File): Promise<Documen
   return response.json();
 }
 
+export async function deleteDocument(orgId: string, documentId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/documents/${documentId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+}
+
+export type OrganizationRole = "owner" | "admin" | "manager" | "member" | "viewer";
+
+export interface Member {
+  user_id: string;
+  email: string;
+  role: OrganizationRole;
+  created_at: string;
+}
+
+export async function listMembers(orgId: string): Promise<Member[]> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/members`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
+export async function addMember(orgId: string, email: string, role: OrganizationRole): Promise<Member> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/members`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email, role }),
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
 export interface Citation {
   chunk_id: string;
   document_id: string;

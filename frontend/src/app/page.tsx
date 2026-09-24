@@ -1,5 +1,6 @@
 import { FileSearch, GitMerge, Quote, ShieldCheck, Upload, MessagesSquare } from "lucide-react";
 import { AuthStatus } from "@/components/auth-status";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Logo } from "@/components/ui/logo";
 import { LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -54,7 +55,10 @@ export default function Home() {
     <>
       <header className="flex items-center justify-between px-6 py-5 sm:px-10">
         <Logo />
-        <AuthStatus />
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+          <AuthStatus />
+        </div>
       </header>
 
       <main className="flex-1">

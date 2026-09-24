@@ -1,13 +1,18 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.organization import OrganizationRole
 
 
 class OrganizationCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
+
+
+class MemberInvite(BaseModel):
+    email: EmailStr
+    role: OrganizationRole = OrganizationRole.MEMBER
 
 
 class OrganizationOut(BaseModel):
