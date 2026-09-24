@@ -3,7 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
+import { Plus, Users } from "lucide-react";
 import { ApiError, createOrganization, fetchCurrentUser, listOrganizations, type Organization } from "@/lib/api";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Logo } from "@/components/ui/logo";
+import { PageSpinner } from "@/components/ui/spinner";
+import { UserMenu } from "@/components/user-menu";
 
 export default function WorkspacesPage() {
   const router = useRouter();
@@ -11,6 +19,7 @@ export default function WorkspacesPage() {
   const [newName, setNewName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,6 +44,7 @@ export default function WorkspacesPage() {
       const org = await createOrganization(newName);
       setOrgs((prev) => [...(prev ?? []), org]);
       setNewName("");
+      setShowCreateForm(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not create workspace");
     } finally {
@@ -43,48 +53,68 @@ export default function WorkspacesPage() {
   }
 
   if (orgs === null) {
-    return (
-      <main className="flex flex-1 items-center justify-center">
-        <p className="text-sm text-neutral-400">Loading workspaces…</p>
-      </main>
-    );
+    return <PageSpinner label="Loading workspaces…" />;
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-16">
-      <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-100">Your workspaces</h1>
+    <>
+      <header className="flex items-center justify-between border-b border-border px-6 py-3">
+        <Link href="/app">
+          <Logo />
+        </Link>
+        <UserMenu />
+      </header>
 
-      <ul className="flex flex-col gap-2">
-        {orgs.map((org) => (
-          <li key={org.id}>
-            <Link
-              href={`/app/${org.id}`}
-              className="flex items-center justify-between rounded-md border border-neutral-200 px-4 py-3 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
-            >
-              <span className="font-medium text-neutral-900 dark:text-neutral-100">{org.name}</span>
-              <span className="text-xs uppercase text-neutral-400">{org.role}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 py-12">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Your workspaces</h1>
+            <p className="mt-1 text-sm text-muted">Pick a workspace to manage its documents and chats.</p>
+          </div>
+          <Button onClick={() => setShowCreateForm((v) => !v)} size="sm">
+            <Plus className="h-4 w-4" />
+            New workspace
+          </Button>
+        </div>
 
-      <form onSubmit={handleCreate} className="flex gap-2 border-t border-neutral-200 pt-6 dark:border-neutral-800">
-        <input
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          placeholder="New workspace name"
-          required
-          className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
-        />
-        <button
-          type="submit"
-          disabled={creating}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-        >
-          Create
-        </button>
-      </form>
-      {error && <p className="text-sm text-red-500">{error}</p>}
-    </main>
+        {showCreateForm && (
+          <Card className="p-4">
+            <form onSubmit={handleCreate} className="flex gap-2">
+              <Input
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Workspace name"
+                autoFocus
+                required
+              />
+              <Button type="submit" disabled={creating}>
+                {creating ? "Creating…" : "Create"}
+              </Button>
+            </form>
+          </Card>
+        )}
+
+        {error && <Alert>{error}</Alert>}
+
+        {orgs.length === 0 ? (
+          <Card className="flex flex-col items-center gap-2 px-6 py-16 text-center">
+            <Users className="h-8 w-8 text-muted" strokeWidth={1.5} />
+            <p className="font-medium text-foreground">No workspaces yet</p>
+            <p className="text-sm text-muted">Create one to start uploading documents and asking questions.</p>
+          </Card>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {orgs.map((org) => (
+              <Link key={org.id} href={`/app/${org.id}`}>
+                <Card className="flex items-center justify-between p-4 transition-colors hover:border-brand/40">
+                  <span className="font-medium text-foreground">{org.name}</span>
+                  <span className="text-xs font-medium uppercase tracking-wide text-muted">{org.role}</span>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )}
+      </main>
+    </>
   );
 }

@@ -13,8 +13,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ThinkDesk",
-  description: "Your knowledge. Your AI workspace.",
+  title: {
+    default: "ThinkDesk — Ask your documents anything",
+    template: "%s · ThinkDesk",
+  },
+  description:
+    "ThinkDesk is an AI knowledge workspace: upload your documents and get evidence-backed answers with real citations, never fabricated ones.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -23,7 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="flex min-h-full flex-col bg-background text-foreground">{children}</body>
     </html>
   );
 }

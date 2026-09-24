@@ -3,6 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { ApiError, login, signup } from "@/lib/api";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input, Label } from "@/components/ui/input";
 
 export function AuthForm({ mode }: { mode: "signup" | "login" }) {
   const router = useRouter();
@@ -31,42 +34,34 @@ export function AuthForm({ mode }: { mode: "signup" | "login" }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex w-full max-w-sm flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <label htmlFor="email" className="text-sm text-neutral-600 dark:text-neutral-300">
-          Email
-        </label>
-        <input
+    <form onSubmit={handleSubmit} className="flex w-full flex-col gap-4">
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="email">Email</Label>
+        <Input
           id="email"
           type="email"
+          autoComplete="email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
         />
       </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="password" className="text-sm text-neutral-600 dark:text-neutral-300">
-          Password
-        </label>
-        <input
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="password">Password</Label>
+        <Input
           id="password"
           type="password"
+          autoComplete={mode === "signup" ? "new-password" : "current-password"}
           required
           minLength={8}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
         />
       </div>
-      {error && <p className="text-sm text-red-500">{error}</p>}
-      <button
-        type="submit"
-        disabled={submitting}
-        className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-      >
+      {error && <Alert>{error}</Alert>}
+      <Button type="submit" disabled={submitting} className="mt-1 w-full">
         {submitting ? "Please wait…" : mode === "signup" ? "Create account" : "Log in"}
-      </button>
+      </Button>
     </form>
   );
 }

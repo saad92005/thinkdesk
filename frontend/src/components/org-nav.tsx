@@ -2,39 +2,50 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { FileText, MessageSquare } from "lucide-react";
+import { LogoMark } from "@/components/ui/logo";
+import { UserMenu } from "@/components/user-menu";
+import { cn } from "@/lib/cn";
 
 export function OrgNav({ orgId, orgName }: { orgId: string; orgName: string }) {
   const pathname = usePathname();
 
   const links = [
-    { href: `/app/${orgId}/documents`, label: "Documents" },
-    { href: `/app/${orgId}/chat`, label: "Chat" },
+    { href: `/app/${orgId}/documents`, label: "Documents", icon: FileText },
+    { href: `/app/${orgId}/chat`, label: "Chat", icon: MessageSquare },
   ];
 
   return (
-    <header className="flex items-center justify-between border-b border-neutral-200 px-6 py-3 dark:border-neutral-800">
-      <div className="flex items-center gap-4">
-        <Link href="/app" className="text-sm text-neutral-400 hover:underline">
-          Workspaces
+    <header className="flex items-center justify-between border-b border-border px-6 py-3">
+      <div className="flex items-center gap-3 text-sm">
+        <Link href="/app" className="flex items-center gap-2 text-muted transition-colors hover:text-foreground">
+          <LogoMark className="h-6 w-6" />
+          <span className="hidden sm:inline">Workspaces</span>
         </Link>
-        <span className="text-neutral-300">/</span>
-        <span className="font-medium text-neutral-900 dark:text-neutral-100">{orgName}</span>
+        <span className="text-border">/</span>
+        <span className="font-medium text-foreground">{orgName}</span>
       </div>
-      <nav className="flex gap-4 text-sm">
-        {links.map((link) => (
-          <Link
-            key={link.href}
-            href={link.href}
-            className={
-              pathname?.startsWith(link.href)
-                ? "font-medium text-neutral-900 underline dark:text-neutral-100"
-                : "text-neutral-500 hover:underline dark:text-neutral-400"
-            }
-          >
-            {link.label}
-          </Link>
-        ))}
-      </nav>
+      <div className="flex items-center gap-6">
+        <nav className="flex gap-1 text-sm">
+          {links.map((link) => {
+            const active = pathname?.startsWith(link.href);
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors",
+                  active ? "bg-brand-soft text-brand" : "text-muted hover:bg-black/[.04] dark:hover:bg-white/[.06]"
+                )}
+              >
+                <link.icon className="h-4 w-4" />
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <UserMenu />
+      </div>
     </header>
   );
 }

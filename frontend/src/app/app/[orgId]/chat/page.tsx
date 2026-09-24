@@ -2,8 +2,13 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { MessageSquarePlus, Send, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { OrgNav } from "@/components/org-nav";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { PageSpinner } from "@/components/ui/spinner";
 import {
   ApiError,
   getConversationMessages,
@@ -12,6 +17,7 @@ import {
   type ChatMessage,
   type ConversationSummary,
 } from "@/lib/api";
+import { cn } from "@/lib/cn";
 import { useOrganization } from "@/lib/useOrganization";
 
 let tempIdCounter = 0;
@@ -85,11 +91,7 @@ export default function ChatPage() {
   }
 
   if (org === undefined) {
-    return (
-      <main className="flex flex-1 items-center justify-center">
-        <p className="text-sm text-neutral-400">Loading…</p>
-      </main>
-    );
+    return <PageSpinner />;
   }
   if (org === null) {
     return (
@@ -103,26 +105,23 @@ export default function ChatPage() {
     <>
       <OrgNav orgId={orgId} orgName={org.name} />
       <main className="mx-auto flex w-full max-w-4xl flex-1 gap-6 px-6 py-6">
-        <aside className="flex w-56 shrink-0 flex-col gap-2 border-r border-neutral-200 pr-4 dark:border-neutral-800">
-          <button
-            onClick={startNewConversation}
-            className="rounded-md border border-neutral-300 px-3 py-1.5 text-left text-sm font-medium text-neutral-900 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-900"
-          >
-            + New chat
-          </button>
+        <aside className="flex w-56 shrink-0 flex-col gap-2 border-r border-border pr-4">
+          <Button onClick={startNewConversation} variant="secondary" size="sm" className="justify-start">
+            <MessageSquarePlus className="h-4 w-4" />
+            New chat
+          </Button>
           <div className="flex flex-col gap-1 overflow-y-auto">
-            {conversations.length === 0 && (
-              <p className="px-1 text-xs text-neutral-400">No conversations yet.</p>
-            )}
+            {conversations.length === 0 && <p className="px-1 text-xs text-muted">No conversations yet.</p>}
             {conversations.map((conversation) => (
               <button
                 key={conversation.id}
                 onClick={() => openConversation(conversation.id)}
-                className={
+                className={cn(
+                  "truncate rounded-md px-3 py-1.5 text-left text-sm transition-colors",
                   conversation.id === conversationId
-                    ? "truncate rounded-md bg-neutral-900 px-3 py-1.5 text-left text-sm text-white dark:bg-neutral-100 dark:text-neutral-900"
-                    : "truncate rounded-md px-3 py-1.5 text-left text-sm text-neutral-600 hover:bg-neutral-50 dark:text-neutral-300 dark:hover:bg-neutral-900"
-                }
+                    ? "bg-brand-soft font-medium text-brand"
+                    : "text-muted hover:bg-black/[.04] dark:hover:bg-white/[.06]"
+                )}
                 title={conversation.title}
               >
                 {conversation.title || "New conversation"}
@@ -134,19 +133,23 @@ export default function ChatPage() {
         <div className="flex flex-1 flex-col">
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto pb-4">
             {messages.length === 0 && (
-              <p className="text-sm text-neutral-400">
-                Ask a question about the documents in this workspace. Answers are grounded in your uploaded
-                documents and always show their sources.
-              </p>
+              <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center">
+                <Sparkles className="h-6 w-6 text-brand" strokeWidth={1.5} />
+                <p className="max-w-xs text-sm text-muted">
+                  Ask a question about the documents in this workspace. Answers are grounded in what you&apos;ve
+                  uploaded and always show their sources.
+                </p>
+              </div>
             )}
             {messages.map((message) => (
               <div key={message.id} className={message.role === "user" ? "self-end" : "self-start"}>
                 <div
-                  className={
+                  className={cn(
+                    "max-w-lg rounded-lg px-4 py-2 text-sm",
                     message.role === "user"
-                      ? "rounded-lg bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900"
-                      : "rounded-lg border border-neutral-200 px-4 py-2 text-sm text-neutral-900 [&_ol]:list-decimal [&_ol]:pl-5 [&_p+p]:mt-2 [&_ul]:list-disc [&_ul]:pl-5 dark:border-neutral-800 dark:text-neutral-100"
-                  }
+                      ? "bg-brand text-brand-foreground"
+                      : "border border-border text-foreground [&_ol]:list-decimal [&_ol]:pl-5 [&_p+p]:mt-2 [&_ul]:list-disc [&_ul]:pl-5"
+                  )}
                 >
                   {message.role === "assistant" ? (
                     <ReactMarkdown>{message.content}</ReactMarkdown>
@@ -159,9 +162,9 @@ export default function ChatPage() {
                     {message.citations.map((citation) => (
                       <div
                         key={citation.chunk_id}
-                        className="rounded border border-neutral-100 bg-neutral-50 px-3 py-1.5 text-xs text-neutral-500 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-400"
+                        className="max-w-lg rounded border border-border bg-surface px-3 py-1.5 text-xs text-muted"
                       >
-                        <span className="font-medium">
+                        <span className="font-medium text-foreground">
                           {citation.filename}
                           {citation.page_number !== null ? ` — page ${citation.page_number}` : ""}
                         </span>
@@ -172,28 +175,21 @@ export default function ChatPage() {
                 )}
               </div>
             ))}
-            {sending && <p className="text-sm text-neutral-400">Thinking…</p>}
+            {sending && <p className="text-sm text-muted">Thinking…</p>}
           </div>
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <Alert>{error}</Alert>}
 
-          <form
-            onSubmit={handleSubmit}
-            className="flex gap-2 border-t border-neutral-200 pt-4 dark:border-neutral-800"
-          >
-            <input
+          <form onSubmit={handleSubmit} className="flex gap-2 border-t border-border pt-4">
+            <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask a question about your documents…"
-              className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-900"
             />
-            <button
-              type="submit"
-              disabled={sending}
-              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-            >
+            <Button type="submit" disabled={sending}>
+              <Send className="h-4 w-4" />
               Send
-            </button>
+            </Button>
           </form>
         </div>
       </main>
