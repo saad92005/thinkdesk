@@ -29,6 +29,11 @@ but not yet installed into the running Postgres instance (needs one
 elevated copy step; a Python fallback is used instead — see
 [docs/roadmap.md](docs/roadmap.md) for details).
 
+The product also has a proper interface, not just working endpoints: a
+real marketing landing page, a small shared design system (`frontend/src/components/ui/`),
+light/dark themes, and consistent branding across the auth flow, workspace
+dashboard, document upload, and chat screens.
+
 ## Stack
 
 - **Frontend:** Next.js, TypeScript, React, Tailwind CSS
@@ -52,7 +57,8 @@ doc for details.
 
 ```
 thinkdesk/
-  frontend/    Next.js app (auth pages, health/status widgets)
+  frontend/    Next.js app (landing page, auth, workspaces, documents, chat)
+    src/components/ui/  Shared design system (Button, Card, Input, etc.)
   backend/     FastAPI app
     app/       auth, organizations, documents, ai, retrieval, chat
     migrations/  Alembic
