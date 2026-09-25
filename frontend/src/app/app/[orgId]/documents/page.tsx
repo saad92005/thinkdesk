@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FileText, GitCompare, Trash2, Upload } from "lucide-react";
+import { FileText, GitCompare, Sparkles, Trash2, Upload } from "lucide-react";
 import { OrgNav } from "@/components/org-nav";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -13,10 +13,12 @@ import {
   ApiError,
   compareDocuments,
   deleteDocument,
+  extractDocument,
   listDocuments,
   uploadDocument,
   type ComparisonResult,
   type DocumentItem,
+  type ExtractionResult,
 } from "@/lib/api";
 import { useOrganization } from "@/lib/useOrganization";
 
@@ -62,6 +64,9 @@ export default function DocumentsPage() {
   const [comparing, setComparing] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
+  const [extractingId, setExtractingId] = useState<string | null>(null);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const [extractions, setExtractions] = useState<Record<string, ExtractionResult>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(() => {
@@ -122,6 +127,27 @@ export default function DocumentsPage() {
       if (prev.length >= 2) return [prev[1], docId];
       return [...prev, docId];
     });
+  }
+
+  async function handleExtract(doc: DocumentItem) {
+    setExtractError(null);
+    if (extractions[doc.id]) {
+      setExtractions((prev) => {
+        const next = { ...prev };
+        delete next[doc.id];
+        return next;
+      });
+      return;
+    }
+    setExtractingId(doc.id);
+    try {
+      const result = await extractDocument(orgId, doc.id);
+      setExtractions((prev) => ({ ...prev, [doc.id]: result }));
+    } catch (err) {
+      setExtractError(err instanceof ApiError ? err.message : "Extraction failed");
+    } finally {
+      setExtractingId(null);
+    }
   }
 
   async function handleCompare() {
@@ -207,41 +233,76 @@ export default function DocumentsPage() {
             <ul className="flex flex-col gap-2">
               {documents.map((doc) => (
                 <li key={doc.id}>
-                  <Card className="flex items-center justify-between gap-3 p-4">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={selected.includes(doc.id)}
-                        onChange={() => toggleSelected(doc.id)}
-                        disabled={doc.status !== "ready"}
-                        aria-label={`Select ${doc.filename} for comparison`}
-                        className="h-4 w-4 shrink-0 accent-brand disabled:opacity-30"
-                      />
-                      <FileText className="h-5 w-5 shrink-0 text-muted" strokeWidth={1.5} />
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">{doc.filename}</p>
-                        <p className="text-xs text-muted">
-                          {formatSize(doc.size_bytes)}
-                          {doc.page_count !== null ? ` · ${doc.page_count} page(s)` : ""}
-                        </p>
-                        {doc.error_message && <p className="mt-0.5 text-xs text-red-500">{doc.error_message}</p>}
+                  <Card className="flex flex-col gap-3 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(doc.id)}
+                          onChange={() => toggleSelected(doc.id)}
+                          disabled={doc.status !== "ready"}
+                          aria-label={`Select ${doc.filename} for comparison`}
+                          className="h-4 w-4 shrink-0 accent-brand disabled:opacity-30"
+                        />
+                        <FileText className="h-5 w-5 shrink-0 text-muted" strokeWidth={1.5} />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-foreground">{doc.filename}</p>
+                          <p className="text-xs text-muted">
+                            {formatSize(doc.size_bytes)}
+                            {doc.page_count !== null ? ` · ${doc.page_count} page(s)` : ""}
+                          </p>
+                          {doc.error_message && <p className="mt-0.5 text-xs text-red-500">{doc.error_message}</p>}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-3">
+                        <Badge tone={STATUS_TONE[doc.status]}>{doc.status}</Badge>
+                        {doc.status === "ready" && (
+                          <button
+                            onClick={() => handleExtract(doc)}
+                            disabled={extractingId === doc.id}
+                            aria-label={`Extract key information from ${doc.filename}`}
+                            className="text-muted transition-colors hover:text-brand disabled:opacity-50"
+                          >
+                            {extractingId === doc.id ? <Spinner className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(doc)}
+                          disabled={deletingId === doc.id}
+                          aria-label={`Delete ${doc.filename}`}
+                          className="text-muted transition-colors hover:text-red-500 disabled:opacity-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-3">
-                      <Badge tone={STATUS_TONE[doc.status]}>{doc.status}</Badge>
-                      <button
-                        onClick={() => handleDelete(doc)}
-                        disabled={deletingId === doc.id}
-                        aria-label={`Delete ${doc.filename}`}
-                        className="text-muted transition-colors hover:text-red-500 disabled:opacity-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
+
+                    {extractions[doc.id] && (
+                      <div className="rounded-lg bg-surface p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                          Extracted information
+                          {extractions[doc.id].truncated && " (from an excerpt — document is long)"}
+                        </p>
+                        {extractions[doc.id].fields.length === 0 ? (
+                          <p className="mt-1 text-sm italic text-muted">No extractable facts found.</p>
+                        ) : (
+                          <dl className="mt-2 flex flex-col gap-1">
+                            {extractions[doc.id].fields.map((field, i) => (
+                              <div key={i} className="flex gap-2 text-sm">
+                                <dt className="shrink-0 font-medium text-foreground">{field.label}:</dt>
+                                <dd className="text-muted">{field.value}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        )}
+                      </div>
+                    )}
                   </Card>
                 </li>
               ))}
             </ul>
+
+            {extractError && <Alert>{extractError}</Alert>}
 
             {selected.length === 2 && (
               <Button onClick={handleCompare} disabled={comparing} className="self-start">

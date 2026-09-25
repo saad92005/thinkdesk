@@ -4,20 +4,22 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.intelligence.schemas import ComparisonRequest, ComparisonResult
+from app.intelligence.schemas import ComparisonRequest, ComparisonResult, ExtractionResult
 from app.intelligence.service import (
     ComparisonUnavailableError,
     DocumentNotFoundError,
     DocumentNotReadyError,
+    ExtractionUnavailableError,
     compare_documents,
+    extract_key_information,
 )
 from app.models.organization import OrganizationMember
 from app.organizations.dependencies import get_organization_membership
 
-router = APIRouter(prefix="/organizations/{organization_id}/documents/compare", tags=["intelligence"])
+router = APIRouter(prefix="/organizations/{organization_id}/documents", tags=["intelligence"])
 
 
-@router.post("", response_model=ComparisonResult)
+@router.post("/compare", response_model=ComparisonResult)
 async def compare_documents_route(
     organization_id: uuid.UUID,
     payload: ComparisonRequest,
@@ -35,3 +37,20 @@ async def compare_documents_route(
         raise HTTPException(status.HTTP_409_CONFLICT, f"'{exc}' hasn't finished processing yet")
     except ComparisonUnavailableError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Comparison unavailable: {exc}")
+
+
+@router.post("/{document_id}/extract", response_model=ExtractionResult)
+async def extract_document_route(
+    organization_id: uuid.UUID,
+    document_id: uuid.UUID,
+    membership: OrganizationMember = Depends(get_organization_membership),
+    db: AsyncSession = Depends(get_db),
+) -> ExtractionResult:
+    try:
+        return await extract_key_information(db, organization_id, document_id)
+    except DocumentNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "That document wasn't found in this workspace")
+    except DocumentNotReadyError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"'{exc}' hasn't finished processing yet")
+    except ExtractionUnavailableError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Extraction unavailable: {exc}")

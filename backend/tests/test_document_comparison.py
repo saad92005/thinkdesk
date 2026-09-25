@@ -56,6 +56,36 @@ async def test_compare_nonexistent_document_returns_404(client):
     assert response.status_code == 404
 
 
+async def test_extract_key_information_from_a_document(client):
+    await client.post("/auth/signup", json={"email": "extract1@example.com", "password": "correcthorse123"})
+    org_id = (await client.get("/organizations")).json()[0]["id"]
+    doc_a = await _upload(
+        client,
+        org_id,
+        "contract.pdf",
+        ["Agreement between Acme Corp and Globex Inc.", "Total contract value: $50,000.", "Effective date: January 1, 2025."],
+    )
+
+    response = await client.post(f"/organizations/{org_id}/documents/{doc_a}/extract")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["document"] == "contract.pdf"
+    assert isinstance(body["fields"], list)
+    assert body["truncated"] is False
+
+
+async def test_extract_from_nonexistent_document_returns_404(client):
+    await client.post("/auth/signup", json={"email": "extract2@example.com", "password": "correcthorse123"})
+    org_id = (await client.get("/organizations")).json()[0]["id"]
+
+    response = await client.post(
+        f"/organizations/{org_id}/documents/00000000-0000-0000-0000-000000000000/extract"
+    )
+
+    assert response.status_code == 404
+
+
 async def test_cannot_compare_a_document_from_another_organization(client, second_client):
     await client.post("/auth/signup", json={"email": "compare4@example.com", "password": "correcthorse123"})
     org_id = (await client.get("/organizations")).json()[0]["id"]

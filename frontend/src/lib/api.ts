@@ -213,6 +213,26 @@ export async function compareDocuments(
   return response.json();
 }
 
+export interface ExtractedField {
+  label: string;
+  value: string;
+}
+
+export interface ExtractionResult {
+  document: string;
+  fields: ExtractedField[];
+  truncated: boolean;
+}
+
+export async function extractDocument(orgId: string, documentId: string): Promise<ExtractionResult> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/documents/${documentId}/extract`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
 export interface Citation {
   chunk_id: string;
   document_id: string;

@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.llm import LLMGenerationError, LLMNotConfiguredError, get_llm_provider
-from app.intelligence.schemas import ComparisonResult
+from app.intelligence.schemas import ComparisonResult, ExtractedField, ExtractionResult
 from app.models.chunk import DocumentChunk
 from app.models.document import Document, DocumentStatus
 
@@ -37,6 +37,10 @@ class DocumentNotReadyError(Exception):
 
 
 class ComparisonUnavailableError(Exception):
+    """The LLM call failed or its response couldn't be parsed."""
+
+
+class ExtractionUnavailableError(Exception):
     """The LLM call failed or its response couldn't be parsed."""
 
 
@@ -106,3 +110,47 @@ async def compare_documents(
         raise ComparisonUnavailableError("The AI provider returned a response that couldn't be parsed")
 
     return ComparisonResult(document_a=doc_a.filename, document_b=doc_b.filename, truncated=truncated, **parsed)
+
+
+_EXTRACTION_SYSTEM_PROMPT = (
+    "You extract key structured facts from a document -- dates, deadlines, "
+    "monetary amounts, named parties/organizations, obligations, and other "
+    "concrete facts a reader would want at a glance. Extract ONLY facts "
+    "actually stated in the text -- never infer or invent one. Respond with "
+    'ONLY a JSON object, nothing else: {"fields": [{"label": "<short field '
+    'name>", "value": "<the extracted fact>"}, ...]}. If the document has no '
+    "such extractable facts, return an empty fields list rather than forcing "
+    "an entry."
+)
+
+
+def _parse_extraction(raw: str) -> list[ExtractedField] | None:
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if not match:
+        return None
+    try:
+        data = json.loads(match.group(0))
+        return [ExtractedField(label=str(item["label"]), value=str(item["value"])) for item in data["fields"]]
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+
+async def extract_key_information(
+    db: AsyncSession, organization_id: uuid.UUID, document_id: uuid.UUID
+) -> ExtractionResult:
+    document, text = await _load_document_text(db, organization_id, document_id)
+    text, truncated = _truncate(text)
+
+    try:
+        provider = get_llm_provider()
+        raw = provider.generate(_EXTRACTION_SYSTEM_PROMPT, text)
+    except LLMNotConfiguredError as exc:
+        raise ExtractionUnavailableError(str(exc)) from exc
+    except LLMGenerationError as exc:
+        raise ExtractionUnavailableError(str(exc)) from exc
+
+    fields = _parse_extraction(raw)
+    if fields is None:
+        raise ExtractionUnavailableError("The AI provider returned a response that couldn't be parsed")
+
+    return ExtractionResult(document=document.filename, fields=fields, truncated=truncated)

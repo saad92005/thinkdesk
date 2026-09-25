@@ -16,3 +16,14 @@ class ComparisonResult(BaseModel):
     differences: list[str]
     contradictions: list[str]
     truncated: bool
+
+
+class ExtractedField(BaseModel):
+    label: str
+    value: str
+
+
+class ExtractionResult(BaseModel):
+    document: str
+    fields: list[ExtractedField]
+    truncated: bool

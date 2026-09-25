@@ -160,10 +160,22 @@ self-contained, which is enough to answer "did my last retrieval/prompt
 change help or hurt," the main thing an evaluation framework needs to do
 at this stage.
 
-### Document intelligence (Phase 3: comparison)
+### Document intelligence (Phase 3: comparison + extraction)
 
-`app/intelligence/` holds Phase 3 features, starting with document
-comparison. `compare_documents()` loads each document's full chunk text
+`app/intelligence/` holds Phase 3 features: document comparison and
+structured extraction, both sharing `_load_document_text()` (org-scoped,
+rejects a document that hasn't finished processing) and the same
+"extract the first `{...}` block, or report unavailable rather than
+guess" response-parsing pattern.
+
+`extract_key_information()` sends a single document's full text to the
+LLM with a prompt scoped narrowly to concrete, stated facts (dates,
+amounts, named parties, obligations) as label/value pairs, explicitly
+instructed not to infer or invent a fact that isn't in the text -- an
+empty `fields` list is a valid result for a document with nothing
+extractable, not a bug.
+
+`compare_documents()` loads each document's full chunk text
 (ordered by `chunk_index`, org-scoped the same way retrieval is), truncates
 either side that exceeds `MAX_CHARS_PER_DOCUMENT` (flagging `truncated:
 true` in the response rather than silently comparing a partial document as

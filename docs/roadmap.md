@@ -40,7 +40,7 @@ Also since V1: **document deletion** (`DELETE /organizations/{id}/documents/{id}
 | Feature | Status |
 |---------|--------|
 | Document comparison + contradiction detection | ✅ Done — `POST /organizations/{id}/documents/compare` runs two documents' full text through the LLM and returns a grounded summary, similarities, differences, and contradictions (never invented -- an empty contradictions list is a valid, honest result); `/app/[orgId]/documents` UI to select two ready documents and see the report |
-| Structured data extraction | Not started |
+| Structured data extraction | ✅ Done — `POST /organizations/{id}/documents/{document_id}/extract` pulls key facts (dates, amounts, parties, obligations) as label/value pairs, grounded strictly in the document's own text; a sparkle button per document on the documents page |
 | Report generation | Not started |
 
 ## Phase 4 — Research Mode

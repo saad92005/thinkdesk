@@ -28,11 +28,13 @@ teammates (if they already have an account), edit roles, or remove
 members per workspace. Run a RAG evaluation against your own documents and
 get real retrieval-hit and LLM-judged faithfulness/relevance scores. Select
 two documents and get a real, grounded comparison — similarities,
-differences, and contradictions — not a guess. Full pytest suite (55
-tests) covers chunking, auth, hybrid search + reranking + query rewriting,
-evaluation scoring, document comparison, and — the part that matters most
-for a multi-tenant app — that one organization's data is genuinely
-unreachable by another.
+differences, and contradictions — or extract key facts (dates, amounts,
+parties, obligations) from a single document, all strictly grounded in
+what's actually in the text. Full pytest suite (57 tests) covers chunking,
+auth, hybrid search + reranking + query rewriting, evaluation scoring,
+document comparison and extraction, and — the part that matters most for a
+multi-tenant app — that one organization's data is genuinely unreachable
+by another.
 
 One known, honestly-documented gap: `pgvector` is compiled and vendored
 but not yet installed into the running Postgres instance (needs one
