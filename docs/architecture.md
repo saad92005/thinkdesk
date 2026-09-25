@@ -290,6 +290,42 @@ similarly isolated: one narrow function, one clear "this is where external
 state changes" comment, reachable only after an equivalent human-approval
 gate.
 
+### Billing (Phase 8): Lemon Squeezy
+
+`app/billing/` follows the same "verify, don't trust" discipline as the
+rest of the codebase, applied to money:
+
+- `lemonsqueezy.py::create_checkout_url()` calls Lemon Squeezy's API to
+  create a real hosted checkout, embedding `organization_id` as
+  `custom_data` -- this is how the webhook later knows which ThinkDesk
+  workspace a subscription belongs to, since Lemon Squeezy echoes
+  `custom_data` back on every subsequent event for that checkout's
+  subscription.
+- `verify_webhook_signature()` recomputes the HMAC-SHA256 of the **raw**
+  request body with the webhook secret and compares it (constant-time,
+  via `hmac.compare_digest`) against Lemon Squeezy's `X-Signature` header.
+  The router reads `request.body()` before any JSON parsing touches it,
+  since re-serializing parsed JSON could produce different bytes than what
+  was actually signed. An unsigned or mismatched request gets a 401 before
+  `service.apply_webhook_event()` ever runs -- the payload's contents are
+  never trusted until the signature proves they came from Lemon Squeezy.
+- `service.apply_webhook_event()` is the **only** code path that changes a
+  `Subscription` row (`app/models/subscription.py`, one per organization).
+  ThinkDesk does not infer plan changes from anything else -- a workspace's
+  billing status is exactly what the last verified webhook said it is.
+  Non-`subscription_*` events (orders, license keys) are accepted and
+  ignored, not rejected, since a webhook can be subscribed to event types
+  this code doesn't act on yet.
+- The upsert is keyed by `organization_id`, not by Lemon Squeezy's
+  subscription id -- a cancel-then-resubscribe produces a new subscription
+  id on Lemon Squeezy's side, but must still update the same workspace's
+  one row rather than create a second.
+
+Local webhook testing needs a public URL (Lemon Squeezy's servers can't
+reach `localhost`); this project uses ngrok's free tier for that, whose
+URL changes on every restart -- not suitable for anything beyond
+development.
+
 ### Database
 
 PostgreSQL 16, native Windows install (Docker isn't available on this

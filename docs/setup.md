@@ -83,16 +83,17 @@ pip install -r requirements-dev.txt
 pytest -v
 ```
 
-81 tests: chunking unit tests, auth security unit tests, the full signup/
+89 tests: chunking unit tests, auth security unit tests, the full signup/
 login/logout flow, tenant-isolation security tests, hybrid search ranking
 (BM25 + reciprocal rank fusion), reranking and query rewriting unit tests,
 document delete, member invites/role editing/removal, RAG evaluation
 scoring, document comparison/extraction/report generation, research mode's
 source-verification logic, the Gmail and Slack connectors' OAuth flows,
-the email-summary agent action's propose/approve/execute split (all
-mocked against Google/Slack, no real accounts needed in CI), and a full
-upload → process → search → chat round trip against a real (but
-generated, throwaway) PDF. Tests run against `thinkdesk_test`, not your
+the email-summary agent action's propose/approve/execute split, Lemon
+Squeezy webhook signature verification and subscription upsert logic (all
+mocked against Google/Slack/Lemon Squeezy, no real accounts needed in CI),
+and a full upload → process → search → chat round trip against a real
+(but generated, throwaway) PDF. Tests run against `thinkdesk_test`, not your
 working database.
 
 #### Enabling connectors (optional)
@@ -144,6 +145,36 @@ people besides your own test-user account to connect), you'll see an
 Note: Slack's "Your App Configuration Tokens" section (visible on the
 Your Apps page) is for the Slack CLI, unrelated to the OAuth Client ID/
 Secret this connector needs -- easy to confuse, ignore it.
+
+#### Enabling billing (optional)
+
+1. Create a free store at [lemonsqueezy.com](https://lemonsqueezy.com) and
+   grab an API key from **Settings → API**, and your store ID from
+   `GET https://api.lemonsqueezy.com/v1/stores` with that key.
+2. **Settings → Webhooks → Add webhook**. The signing secret here is one
+   *you* choose (6-40 characters, any random string) -- Lemon Squeezy
+   doesn't generate it for you. Check `subscription_created`,
+   `subscription_updated`, `subscription_cancelled`.
+3. The Callback URL must be a real, internet-reachable HTTPS address --
+   `localhost` won't work, since Lemon Squeezy's servers can't reach your
+   own machine directly. For local development, use
+   [ngrok](https://ngrok.com) (`ngrok http 8000`) and paste the printed
+   `https://....ngrok-free.dev/billing/lemonsqueezy/webhook` URL in. This
+   URL changes every time the ngrok tunnel restarts.
+4. Add all four values to `backend/.env`:
+   ```
+   LEMONSQUEEZY_API_KEY=...
+   LEMONSQUEEZY_STORE_ID=...
+   LEMONSQUEEZY_WEBHOOK_SECRET=...     # the one you chose in step 2
+   ```
+5. Create a **Product** and at least one **Variant** (the actual plan
+   you're selling, e.g. "Pro Monthly") in the dashboard, then set:
+   ```
+   LEMONSQUEEZY_VARIANT_ID=...
+   ```
+   Without this, `/billing/checkout` returns a clear "not fully
+   configured" error instead of attempting a checkout -- the webhook
+   receiver and signature verification work independently of this step.
 
 ### 3. Frontend
 

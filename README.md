@@ -16,12 +16,14 @@ pieces fit together.
 
 **Phases 1 through 4 are all fully complete**: AI Knowledge Assistant,
 Advanced RAG, Document Intelligence, and Research Mode. **Phase 7
-(Integrations) has working Gmail and Slack connectors**, and **Phase 5 (AI
-Agents) has its first real action** built on top of them — real OAuth
-flows, encrypted token storage, a reusable connector architecture other
-integrations (Notion, Outlook, ...) can follow, and a genuine
-propose-review-approve-execute agent loop, not a demo that skips the
-approval step. Signup → login →
+(Integrations) has working Gmail and Slack connectors**, **Phase 5 (AI
+Agents) has its first real action** built on top of them, and **Phase 8
+(SaaS) has real billing wired up** — real OAuth flows, encrypted token
+storage, a reusable connector architecture other integrations (Notion,
+Outlook, ...) can follow, a genuine propose-review-approve-execute agent
+loop (not a demo that skips the approval step), and signature-verified
+Lemon Squeezy checkout + webhooks (not a fake "Upgrade" button). Signup →
+login →
 create workspace → upload a PDF → it gets extracted, chunked, and embedded
 locally (no API key needed) → ask a question → the LLM rewrites it into
 alternate phrasings to widen recall, retrieval fuses vector + BM25 keyword
@@ -42,14 +44,17 @@ list its channels — both read-only by default. On top of that, ask the
 agent to draft a summary of your recent emails, review and edit it
 yourself, and only when you click "Approve & post" does it actually reach
 Slack — the AI never sends anything without that explicit human step.
-Full pytest suite (81 tests) covers all of the above and — the part that
-matters most for a multi-tenant app — that one organization's data is
-genuinely unreachable by another.
+Subscribe to a real plan via Lemon Squeezy checkout, and a workspace's
+billing status updates only from a signature-verified webhook — never
+guessed or set client-side. Full pytest suite (89 tests) covers all of the
+above and — the part that matters most for a multi-tenant app — that one
+organization's data is genuinely unreachable by another.
 
 Billing note: **Stripe doesn't support Pakistan-based accounts**, so this
-project is set up for **Lemon Squeezy** instead (a Merchant of Record
-platform with no home-country restriction) — credentials are configured,
-the actual checkout/webhook integration is next.
+project uses **Lemon Squeezy** instead (a Merchant of Record platform with
+no home-country restriction). Checkout creation and webhook handling are
+both built and tested; the one remaining step is creating an actual priced
+plan (a Product + Variant) in the Lemon Squeezy dashboard.
 
 One known, honestly-documented gap: `pgvector` is compiled and vendored
 but not yet installed into the running Postgres instance (needs one

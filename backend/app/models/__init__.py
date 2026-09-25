@@ -4,6 +4,7 @@ from app.models.document import Document, DocumentStatus
 from app.models.message import Conversation, Message, MessageRole
 from app.models.organization import Organization, OrganizationMember, OrganizationRole
 from app.models.session import Session
+from app.models.subscription import Subscription, SubscriptionStatus
 from app.models.user import User
 
 __all__ = [
@@ -19,5 +20,7 @@ __all__ = [
     "OrganizationMember",
     "OrganizationRole",
     "Session",
+    "Subscription",
+    "SubscriptionStatus",
     "User",
 ]

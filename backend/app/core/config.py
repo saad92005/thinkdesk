@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     lemonsqueezy_api_key: str | None = None
     lemonsqueezy_store_id: str | None = None
     lemonsqueezy_webhook_secret: str | None = None
+    # The variant (plan) ID for the subscription being sold -- create a
+    # Product + Variant in the Lemon Squeezy dashboard first, then find its
+    # ID under that variant's own page (or GET /v1/variants with the API key).
+    lemonsqueezy_variant_id: str | None = None
 
     @property
     def cors_origin_list(self) -> list[str]:

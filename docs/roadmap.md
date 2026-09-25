@@ -148,17 +148,47 @@ needs a human-approval step before it executes, not just before it's
 once their own OAuth credentials are supplied -- each is additional, not a
 redesign.
 
-## Phase 8 — SaaS
+## Phase 8 — SaaS — 🚧 Started (Lemon Squeezy billing)
 
-RBAC (partially in place via organization roles), usage tracking, plans/
-billing, analytics, public API. Billing needs a real payment provider
-account before it can be wired up for real -- **Stripe doesn't support
-Pakistan-based accounts**, so this project uses **Lemon Squeezy** instead
-(a Merchant of Record platform: no home-country restriction, handles
-global sales tax compliance, payouts via bank transfer/Payoneer/Wise). API
-key and store ID (`482878`) are already in `backend/.env`; the actual
-checkout + webhook integration isn't built yet -- that's the next step
-once a webhook signing secret is created in the Lemon Squeezy dashboard.
+RBAC is partially in place via organization roles; usage tracking,
+analytics, and a public API remain not started. Billing is real, not a
+placeholder: **Stripe doesn't support Pakistan-based accounts**, so this
+project uses **Lemon Squeezy** instead (a Merchant of Record platform: no
+home-country restriction, handles global sales tax compliance, payouts via
+bank transfer/Payoneer/Wise).
+
+- `app/billing/lemonsqueezy.py::create_checkout_url()` creates a real
+  hosted Lemon Squeezy checkout session via their API, embedding the
+  organization's id as `custom_data` so the webhook can later tell which
+  workspace subscribed.
+- `verify_webhook_signature()` checks Lemon Squeezy's `X-Signature` header
+  (HMAC-SHA256 of the *raw* request body) before anything in the payload
+  is trusted -- an unsigned or tampered webhook is rejected with 401, not
+  processed.
+- `app/billing/service.py::apply_webhook_event()` is the **only** place a
+  workspace's plan ever changes -- ThinkDesk never infers or guesses a
+  plan change, it only reflects what a signature-verified Lemon Squeezy
+  webhook actually says happened. One `Subscription` row per organization
+  (`app/models/subscription.py`), upserted by organization id so a
+  resubscribe after cancellation updates the same row rather than
+  creating a second one.
+- `POST /organizations/{id}/billing/checkout` (owner/admin only), `GET
+  .../billing/subscription`, `POST /billing/lemonsqueezy/webhook`
+  (unauthenticated by session -- authenticated by signature instead, since
+  Lemon Squeezy's servers call it directly). `/app/[orgId]/billing` UI.
+  8 new backend tests (89 total): signature accept/reject/tamper, role
+  gating, and a create-then-cancel webhook sequence proving the upsert
+  logic updates the right row.
+- Verified live: hitting "Subscribe" with no plan configured yet correctly
+  surfaces "Lemon Squeezy isn't fully configured... create a Product +
+  Variant in the dashboard first" in the UI, rather than a raw 500 --
+  exactly the fail-clearly pattern used everywhere else in this codebase.
+
+**One step left to make checkout actually work**: a Product + Variant
+(an actual priced plan) needs to exist in the Lemon Squeezy dashboard, and
+its variant ID goes in `LEMONSQUEEZY_VARIANT_ID`. The webhook receiver and
+signature verification are fully functional independent of that -- only
+the "start a checkout" half needs it.
 
 ---
 
@@ -168,22 +198,24 @@ evaluation), Document Intelligence (comparison, contradiction detection,
 extraction, report generation), and Research Mode (topic-driven research
 across the whole knowledge base with deterministic multi-source
 verification). Phase 7 (Integrations) has working Gmail and Slack
-connectors sharing one reusable OAuth architecture, and Phase 5 (AI
-Agents) has its first real action: draft a Gmail summary, review it, and
-explicitly approve before it's posted to Slack. All of it tested
-end-to-end (81 backend tests) and verified live in a real browser session,
-not just unit tests -- including a real Playwright run where the LLM
-correctly marked a claim `verified` after finding it corroborated across
-two separate uploaded documents, and real redirects to both Google's and
-Slack's actual consent screens using this project's real registered OAuth
-clients. One known, clearly-flagged gap remains: `pgvector` needs one
+connectors sharing one reusable OAuth architecture, Phase 5 (AI Agents)
+has its first real action (draft a Gmail summary, review it, explicitly
+approve before it's posted to Slack), and Phase 8 (SaaS) has real Lemon
+Squeezy billing wired up (checkout creation + signature-verified webhook
+handling). All of it tested end-to-end (89 backend tests) and verified
+live in a real browser session, not just unit tests -- including a real
+Playwright run where the LLM correctly marked a claim `verified` after
+finding it corroborated across two separate uploaded documents, real
+redirects to both Google's and Slack's actual consent screens, and a
+real ngrok tunnel confirmed reachable for Lemon Squeezy's webhook
+delivery. One known, clearly-flagged gap remains: `pgvector` needs one
 elevated copy command to finish installing — see
 `backend/vendor/pgvector-win64/README.md`; the Python cosine + BM25 +
 reranking pipeline is correct in the meantime, just
 not indexed/scaled.
 
-Next up: Lemon Squeezy checkout + webhook integration (Phase 8's real
-first slice) -- all three credentials (API key, store ID, webhook signing
-secret) are now in hand. A second agent action, or a third connector
-(Notion's token is already stored, unused), follow the same now-proven
-patterns whenever prioritized.
+Next up: create a Product + Variant in the Lemon Squeezy dashboard and set
+`LEMONSQUEEZY_VARIANT_ID` to actually complete a real subscription
+end-to-end (checkout -> webhook -> Subscription row). A second agent
+action, or a third connector (Notion's token is already stored, unused),
+follow the same now-proven patterns whenever prioritized.

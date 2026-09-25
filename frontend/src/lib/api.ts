@@ -492,3 +492,31 @@ export async function runEvaluation(orgId: string, cases: EvalCase[]): Promise<E
   if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
   return response.json();
 }
+
+export type SubscriptionStatus = "on_trial" | "active" | "paused" | "past_due" | "unpaid" | "cancelled" | "expired";
+
+export interface Subscription {
+  status: SubscriptionStatus;
+  variant_name: string;
+  renews_at: string | null;
+  ends_at: string | null;
+}
+
+export async function getSubscription(orgId: string): Promise<Subscription | null> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/billing/subscription`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
+export async function createCheckout(orgId: string): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/billing/checkout`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  const data = await response.json();
+  return data.checkout_url;
+}
