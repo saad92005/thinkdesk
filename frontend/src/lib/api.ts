@@ -169,6 +169,25 @@ export async function addMember(orgId: string, email: string, role: Organization
   return response.json();
 }
 
+export async function updateMemberRole(orgId: string, userId: string, role: OrganizationRole): Promise<Member> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/members/${userId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ role }),
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
+export async function removeMember(orgId: string, userId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/members/${userId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+}
+
 export interface Citation {
   chunk_id: string;
   document_id: string;

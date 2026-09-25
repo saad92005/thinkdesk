@@ -8,14 +8,17 @@ from app.database import get_db
 from app.models.organization import OrganizationMember, OrganizationRole
 from app.models.user import User
 from app.organizations.dependencies import get_organization_membership
-from app.organizations.schemas import MemberInvite, MemberOut, OrganizationCreate, OrganizationOut
+from app.organizations.schemas import MemberInvite, MemberOut, MemberRoleUpdate, OrganizationCreate, OrganizationOut
 from app.organizations.service import (
     AlreadyMemberError,
+    LastOwnerError,
     UserNotFoundError,
     add_member,
     create_organization,
     list_members,
     list_user_organizations,
+    remove_member,
+    update_member_role,
 )
 
 MANAGE_MEMBERS_ROLES = {OrganizationRole.OWNER, OrganizationRole.ADMIN}
@@ -80,3 +83,49 @@ async def add_member_route(
     return MemberOut.model_validate(
         {"user_id": user.id, "email": user.email, "role": member.role, "created_at": member.created_at}
     )
+
+
+@router.patch("/{organization_id}/members/{user_id}", response_model=MemberOut)
+async def update_member_role_route(
+    organization_id: uuid.UUID,
+    user_id: uuid.UUID,
+    payload: MemberRoleUpdate,
+    membership: OrganizationMember = Depends(get_organization_membership),
+    db: AsyncSession = Depends(get_db),
+) -> MemberOut:
+    if membership.role not in MANAGE_MEMBERS_ROLES:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only owners and admins can change member roles")
+
+    try:
+        member = await update_member_role(db, organization_id, user_id, payload.role)
+    except LastOwnerError:
+        raise HTTPException(status.HTTP_409_CONFLICT, "An organization must always have at least one owner")
+
+    if member is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "That user isn't a member of this organization")
+
+    user = await db.get(User, user_id)
+    return MemberOut.model_validate(
+        {"user_id": user.id, "email": user.email, "role": member.role, "created_at": member.created_at}
+    )
+
+
+@router.delete("/{organization_id}/members/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_member_route(
+    organization_id: uuid.UUID,
+    user_id: uuid.UUID,
+    membership: OrganizationMember = Depends(get_organization_membership),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    is_self = user_id == current_user.id
+    if not is_self and membership.role not in MANAGE_MEMBERS_ROLES:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only owners and admins can remove other members")
+
+    try:
+        removed = await remove_member(db, organization_id, user_id)
+    except LastOwnerError:
+        raise HTTPException(status.HTTP_409_CONFLICT, "An organization must always have at least one owner")
+
+    if not removed:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "That user isn't a member of this organization")

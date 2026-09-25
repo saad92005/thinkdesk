@@ -17,6 +17,9 @@ __pycache__/
 venv/
 backend/.pytest_cache/
 backend/data/
+backend/uvicorn.log
+frontend/nextdev.log
+*.log
 
 # Editors / OS
 .vscode/

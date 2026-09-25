@@ -15,6 +15,10 @@ class MemberInvite(BaseModel):
     role: OrganizationRole = OrganizationRole.MEMBER
 
 
+class MemberRoleUpdate(BaseModel):
+    role: OrganizationRole
+
+
 class OrganizationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

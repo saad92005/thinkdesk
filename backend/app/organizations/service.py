@@ -83,3 +83,49 @@ async def add_member(
     await db.commit()
     await db.refresh(member)
     return member, user
+
+
+class LastOwnerError(Exception):
+    """Raised when demoting or removing a member would leave the
+    organization with zero owners -- there must always be someone who can
+    manage it, so this is blocked rather than silently allowed."""
+
+
+async def _count_owners(db: AsyncSession, organization_id: uuid.UUID) -> int:
+    result = await db.execute(
+        select(OrganizationMember).where(
+            OrganizationMember.organization_id == organization_id,
+            OrganizationMember.role == OrganizationRole.OWNER,
+        )
+    )
+    return len(result.scalars().all())
+
+
+async def update_member_role(
+    db: AsyncSession, organization_id: uuid.UUID, target_user_id: uuid.UUID, new_role: OrganizationRole
+) -> OrganizationMember | None:
+    member = await get_membership(db, organization_id, target_user_id)
+    if member is None:
+        return None
+
+    if member.role == OrganizationRole.OWNER and new_role != OrganizationRole.OWNER:
+        if await _count_owners(db, organization_id) <= 1:
+            raise LastOwnerError()
+
+    member.role = new_role
+    await db.commit()
+    await db.refresh(member)
+    return member
+
+
+async def remove_member(db: AsyncSession, organization_id: uuid.UUID, target_user_id: uuid.UUID) -> bool:
+    member = await get_membership(db, organization_id, target_user_id)
+    if member is None:
+        return False
+
+    if member.role == OrganizationRole.OWNER and await _count_owners(db, organization_id) <= 1:
+        raise LastOwnerError()
+
+    await db.delete(member)
+    await db.commit()
+    return True
