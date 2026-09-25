@@ -2,23 +2,26 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FileText, GitCompare, Sparkles, Trash2, Upload } from "lucide-react";
+import { FileBarChart2, FileText, GitCompare, Sparkles, Trash2, Upload } from "lucide-react";
 import { OrgNav } from "@/components/org-nav";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Spinner, PageSpinner } from "@/components/ui/spinner";
 import {
   ApiError,
   compareDocuments,
   deleteDocument,
   extractDocument,
+  generateReport,
   listDocuments,
   uploadDocument,
   type ComparisonResult,
   type DocumentItem,
   type ExtractionResult,
+  type ReportResult,
 } from "@/lib/api";
 import { useOrganization } from "@/lib/useOrganization";
 
@@ -28,6 +31,8 @@ const STATUS_TONE: Record<DocumentItem["status"], "neutral" | "warning" | "succe
   ready: "success",
   failed: "danger",
 };
+
+const MAX_REPORT_SELECTION = 5;
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -67,6 +72,10 @@ export default function DocumentsPage() {
   const [extractingId, setExtractingId] = useState<string | null>(null);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [extractions, setExtractions] = useState<Record<string, ExtractionResult>>({});
+  const [reportFocus, setReportFocus] = useState("");
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [report, setReport] = useState<ReportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(() => {
@@ -122,9 +131,11 @@ export default function DocumentsPage() {
   function toggleSelected(docId: string) {
     setComparison(null);
     setComparisonError(null);
+    setReport(null);
+    setReportError(null);
     setSelected((prev) => {
       if (prev.includes(docId)) return prev.filter((id) => id !== docId);
-      if (prev.length >= 2) return [prev[1], docId];
+      if (prev.length >= MAX_REPORT_SELECTION) return [...prev.slice(1), docId];
       return [...prev, docId];
     });
   }
@@ -165,6 +176,21 @@ export default function DocumentsPage() {
     }
   }
 
+  async function handleGenerateReport() {
+    if (selected.length === 0) return;
+    setGeneratingReport(true);
+    setReportError(null);
+    setReport(null);
+    try {
+      const result = await generateReport(orgId, selected, reportFocus.trim() || undefined);
+      setReport(result);
+    } catch (err) {
+      setReportError(err instanceof ApiError ? err.message : "Report generation failed");
+    } finally {
+      setGeneratingReport(false);
+    }
+  }
+
   if (org === undefined || documents === null) {
     return <PageSpinner />;
   }
@@ -183,7 +209,8 @@ export default function DocumentsPage() {
         <div>
           <h1 className="text-xl font-semibold text-foreground">Documents</h1>
           <p className="mt-1 text-sm text-muted">
-            Upload PDFs to make them searchable in Chat. Select two ready documents to compare them.
+            Upload PDFs to make them searchable in Chat. Select up to {MAX_REPORT_SELECTION} ready documents to
+            generate a report, or exactly two to compare them.
           </p>
         </div>
 
@@ -304,11 +331,30 @@ export default function DocumentsPage() {
 
             {extractError && <Alert>{extractError}</Alert>}
 
-            {selected.length === 2 && (
-              <Button onClick={handleCompare} disabled={comparing} className="self-start">
-                {comparing ? <Spinner className="h-4 w-4" /> : <GitCompare className="h-4 w-4" />}
-                Compare selected documents
-              </Button>
+            {selected.length > 0 && (
+              <Card className="flex flex-col gap-3 p-4">
+                <p className="text-xs text-muted">
+                  {selected.length} document{selected.length === 1 ? "" : "s"} selected
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {selected.length === 2 && (
+                    <Button onClick={handleCompare} disabled={comparing} variant="secondary">
+                      {comparing ? <Spinner className="h-4 w-4" /> : <GitCompare className="h-4 w-4" />}
+                      Compare selected
+                    </Button>
+                  )}
+                  <Input
+                    value={reportFocus}
+                    onChange={(e) => setReportFocus(e.target.value)}
+                    placeholder="Optional report focus, e.g. revenue growth"
+                    className="min-w-0 flex-1"
+                  />
+                  <Button onClick={handleGenerateReport} disabled={generatingReport}>
+                    {generatingReport ? <Spinner className="h-4 w-4" /> : <FileBarChart2 className="h-4 w-4" />}
+                    Generate report
+                  </Button>
+                </div>
+              </Card>
             )}
 
             {comparisonError && <Alert>{comparisonError}</Alert>}
@@ -329,6 +375,24 @@ export default function DocumentsPage() {
                   items={comparison.contradictions}
                   empty="None found."
                 />
+              </Card>
+            )}
+
+            {reportError && <Alert>{reportError}</Alert>}
+
+            {report && (
+              <Card className="flex flex-col gap-4 p-5">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted">
+                    {report.documents.join(", ")}
+                    {report.truncated && " (long documents — reported on excerpts)"}
+                  </p>
+                  <h2 className="mt-1 text-lg font-semibold text-foreground">{report.title}</h2>
+                  <p className="mt-1 text-sm text-foreground">{report.overview}</p>
+                </div>
+                <ComparisonList title="Key findings" items={report.key_findings} empty="None noted." />
+                <ComparisonList title="Risks or gaps" items={report.risks_or_gaps} empty="None noted." />
+                <ComparisonList title="Recommendations" items={report.recommendations} empty="None noted." />
               </Card>
             )}
           </>

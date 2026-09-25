@@ -175,6 +175,14 @@ instructed not to infer or invent a fact that isn't in the text -- an
 empty `fields` list is a valid result for a document with nothing
 extractable, not a bug.
 
+`generate_report()` extends the same pattern to up to 5 documents at once:
+each is loaded and truncated to a smaller per-document budget
+(`REPORT_MAX_CHARS_PER_DOCUMENT`, since several documents share one
+prompt), combined into one prompt with an optional user-supplied focus
+area, and synthesized into a structured report -- title, overview, key
+findings, risks/gaps, recommendations -- grounded strictly in what the
+combined excerpts say.
+
 `compare_documents()` loads each document's full chunk text
 (ordered by `chunk_index`, org-scoped the same way retrieval is), truncates
 either side that exceeds `MAX_CHARS_PER_DOCUMENT` (flagging `truncated:

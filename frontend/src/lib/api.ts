@@ -233,6 +233,27 @@ export async function extractDocument(orgId: string, documentId: string): Promis
   return response.json();
 }
 
+export interface ReportResult {
+  title: string;
+  documents: string[];
+  overview: string;
+  key_findings: string[];
+  risks_or_gaps: string[];
+  recommendations: string[];
+  truncated: boolean;
+}
+
+export async function generateReport(orgId: string, documentIds: string[], focus?: string): Promise<ReportResult> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/documents/report`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ document_ids: documentIds, focus: focus || null }),
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
 export interface Citation {
   chunk_id: string;
   document_id: string;

@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.llm import LLMGenerationError, LLMNotConfiguredError, get_llm_provider
-from app.intelligence.schemas import ComparisonResult, ExtractedField, ExtractionResult
+from app.intelligence.schemas import ComparisonResult, ExtractedField, ExtractionResult, ReportResult
 from app.models.chunk import DocumentChunk
 from app.models.document import Document, DocumentStatus
 
@@ -44,6 +44,10 @@ class ExtractionUnavailableError(Exception):
     """The LLM call failed or its response couldn't be parsed."""
 
 
+class ReportUnavailableError(Exception):
+    """The LLM call failed or its response couldn't be parsed."""
+
+
 async def _load_document_text(db: AsyncSession, organization_id: uuid.UUID, document_id: uuid.UUID) -> tuple[Document, str]:
     document = await db.get(Document, document_id)
     if document is None or document.organization_id != organization_id:
@@ -60,10 +64,10 @@ async def _load_document_text(db: AsyncSession, organization_id: uuid.UUID, docu
     return document, "\n\n".join(chunk.text for chunk in chunks)
 
 
-def _truncate(text: str) -> tuple[str, bool]:
-    if len(text) <= MAX_CHARS_PER_DOCUMENT:
+def _truncate(text: str, limit: int = MAX_CHARS_PER_DOCUMENT) -> tuple[str, bool]:
+    if len(text) <= limit:
         return text, False
-    return text[:MAX_CHARS_PER_DOCUMENT], True
+    return text[:limit], True
 
 
 def _parse_comparison(raw: str) -> dict | None:
@@ -154,3 +158,72 @@ async def extract_key_information(
         raise ExtractionUnavailableError("The AI provider returned a response that couldn't be parsed")
 
     return ExtractionResult(document=document.filename, fields=fields, truncated=truncated)
+
+
+# Smaller per-document budget than comparison/extraction since a report can
+# combine up to 5 documents -- keeps the combined prompt from ballooning.
+REPORT_MAX_CHARS_PER_DOCUMENT = 6000
+
+_REPORT_SYSTEM_PROMPT = (
+    "You synthesize a report from one or more documents. Use ONLY what the "
+    "excerpts actually say -- never invent a finding, risk, or recommendation "
+    "not grounded in the text. If a focus area is given, emphasize it, but "
+    "don't ignore other material findings. Respond with ONLY a JSON object, "
+    'nothing else: {"title": "<short report title>", "overview": "<2-3 '
+    'sentence overview>", "key_findings": ["..."], "risks_or_gaps": ["..."], '
+    '"recommendations": ["..."]}. Each list item is a short, specific '
+    "sentence. Leave a list empty rather than forcing an entry that isn't "
+    "actually supported by the text."
+)
+
+
+def _parse_report(raw: str) -> dict | None:
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if not match:
+        return None
+    try:
+        data = json.loads(match.group(0))
+        return {
+            "title": str(data["title"]),
+            "overview": str(data["overview"]),
+            "key_findings": [str(item) for item in data.get("key_findings", [])],
+            "risks_or_gaps": [str(item) for item in data.get("risks_or_gaps", [])],
+            "recommendations": [str(item) for item in data.get("recommendations", [])],
+        }
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+
+async def generate_report(
+    db: AsyncSession, organization_id: uuid.UUID, document_ids: list[uuid.UUID], focus: str | None
+) -> ReportResult:
+    documents_text: list[tuple[Document, str, bool]] = []
+    for document_id in document_ids:
+        document, text = await _load_document_text(db, organization_id, document_id)
+        text, truncated = _truncate(text, limit=REPORT_MAX_CHARS_PER_DOCUMENT)
+        documents_text.append((document, text, truncated))
+
+    any_truncated = any(truncated for _doc, _text, truncated in documents_text)
+    blocks = "\n\n".join(
+        f"Document: {doc.filename}{' [truncated]' if truncated else ''}\n{text}"
+        for doc, text, truncated in documents_text
+    )
+    prompt = blocks if not focus else f"Focus area: {focus}\n\n{blocks}"
+
+    try:
+        provider = get_llm_provider()
+        raw = provider.generate(_REPORT_SYSTEM_PROMPT, prompt)
+    except LLMNotConfiguredError as exc:
+        raise ReportUnavailableError(str(exc)) from exc
+    except LLMGenerationError as exc:
+        raise ReportUnavailableError(str(exc)) from exc
+
+    parsed = _parse_report(raw)
+    if parsed is None:
+        raise ReportUnavailableError("The AI provider returned a response that couldn't be parsed")
+
+    return ReportResult(
+        documents=[doc.filename for doc, _text, _truncated in documents_text],
+        truncated=any_truncated,
+        **parsed,
+    )

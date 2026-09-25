@@ -41,7 +41,7 @@ Also since V1: **document deletion** (`DELETE /organizations/{id}/documents/{id}
 |---------|--------|
 | Document comparison + contradiction detection | ✅ Done — `POST /organizations/{id}/documents/compare` runs two documents' full text through the LLM and returns a grounded summary, similarities, differences, and contradictions (never invented -- an empty contradictions list is a valid, honest result); `/app/[orgId]/documents` UI to select two ready documents and see the report |
 | Structured data extraction | ✅ Done — `POST /organizations/{id}/documents/{document_id}/extract` pulls key facts (dates, amounts, parties, obligations) as label/value pairs, grounded strictly in the document's own text; a sparkle button per document on the documents page |
-| Report generation | Not started |
+| Report generation | ✅ Done — `POST /organizations/{id}/documents/report` synthesizes up to 5 documents (with an optional focus area) into a structured report: title, overview, key findings, risks/gaps, recommendations, all grounded in the source text |
 
 ## Phase 4 — Research Mode
 
@@ -72,21 +72,23 @@ provider (e.g. Stripe) account before it can be wired up for real.
 
 ---
 
-**Current focus:** Phase 2 (Advanced RAG) is fully complete — hybrid
-search, reranking, query rewriting, and a RAG evaluation framework (Steps
-17–20). Phase 3 (Document Intelligence) is underway: document comparison
-with contradiction detection is done. All of it tested end-to-end,
-including real LLM-generated answers (Groq `openai/gpt-oss-120b`), real
-LLM-judged evaluation scores, and a real LLM-generated comparison
-correctly catching a planted contradiction between two test documents --
-verified live in a real browser session, not just unit tests. One known,
-clearly-flagged gap remains: `pgvector` needs one elevated copy command to
-finish installing — see `backend/vendor/pgvector-win64/README.md`; the
-Python cosine + BM25 + reranking pipeline is correct in the meantime, just
-not indexed/scaled.
+**Current focus:** Phase 2 (Advanced RAG) and Phase 3 (Document
+Intelligence) are both fully complete — hybrid search, reranking, query
+rewriting, RAG evaluation, document comparison + contradiction detection,
+structured extraction, and multi-document report generation. All of it
+tested end-to-end, including real LLM-generated answers (Groq
+`openai/gpt-oss-120b`), real LLM-judged evaluation scores, a real
+LLM-generated comparison correctly catching a planted contradiction
+between two test documents, and a real multi-document report correctly
+synthesizing a focused finding across them -- verified live in a real
+browser session, not just unit tests. One known, clearly-flagged gap
+remains: `pgvector` needs one elevated copy command to finish installing —
+see `backend/vendor/pgvector-win64/README.md`; the Python cosine + BM25 +
+reranking pipeline is correct in the meantime, just not indexed/scaled.
 
-Next up: structured data extraction and report generation (rest of Phase
-3) are credential-free and can proceed. Phases 5–7 (agents with real
+Next up: Phase 4 (Research Mode — multi-document research with source
+verification and structured reports) builds naturally on what Phase 3
+just delivered, and is credential-free. Phases 5–7 (agents with real
 external tools, automation on real external services, integrations) need
 credentials/accounts this session cannot create — those should be scoped
 with the project owner before implementation starts, per the master

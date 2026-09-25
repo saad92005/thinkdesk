@@ -14,11 +14,9 @@ pieces fit together.
 
 ## Current status
 
-**Phase 1 (V1) — AI Knowledge Assistant** and **Phase 2 — Advanced RAG —
-both fully complete** (hybrid search, reranking, query rewriting, RAG
-evaluation), and **Phase 3 — Document Intelligence — underway** (document
-comparison + contradiction detection done). Signup → login → create
-workspace → upload a PDF → it gets extracted, chunked, and embedded
+**Phase 1 (V1) — AI Knowledge Assistant**, **Phase 2 — Advanced RAG**, and
+**Phase 3 — Document Intelligence — all fully complete.** Signup → login →
+create workspace → upload a PDF → it gets extracted, chunked, and embedded
 locally (no API key needed) → ask a question → the LLM rewrites it into
 alternate phrasings to widen recall, retrieval fuses vector + BM25 keyword
 search across all phrasings (Reciprocal Rank Fusion), then reranks with a
@@ -28,13 +26,14 @@ teammates (if they already have an account), edit roles, or remove
 members per workspace. Run a RAG evaluation against your own documents and
 get real retrieval-hit and LLM-judged faithfulness/relevance scores. Select
 two documents and get a real, grounded comparison — similarities,
-differences, and contradictions — or extract key facts (dates, amounts,
-parties, obligations) from a single document, all strictly grounded in
-what's actually in the text. Full pytest suite (57 tests) covers chunking,
+differences, and contradictions — extract key facts (dates, amounts,
+parties, obligations) from a single document, or generate a synthesized,
+focused report across up to 5 documents at once — all strictly grounded in
+what's actually in the text. Full pytest suite (60 tests) covers chunking,
 auth, hybrid search + reranking + query rewriting, evaluation scoring,
-document comparison and extraction, and — the part that matters most for a
-multi-tenant app — that one organization's data is genuinely unreachable
-by another.
+document comparison/extraction/reports, and — the part that matters most
+for a multi-tenant app — that one organization's data is genuinely
+unreachable by another.
 
 One known, honestly-documented gap: `pgvector` is compiled and vendored
 but not yet installed into the running Postgres instance (needs one

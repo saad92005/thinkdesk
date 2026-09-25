@@ -1,6 +1,6 @@
 import uuid
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ComparisonRequest(BaseModel):
@@ -26,4 +26,19 @@ class ExtractedField(BaseModel):
 class ExtractionResult(BaseModel):
     document: str
     fields: list[ExtractedField]
+    truncated: bool
+
+
+class ReportRequest(BaseModel):
+    document_ids: list[uuid.UUID] = Field(min_length=1, max_length=5)
+    focus: str | None = Field(default=None, max_length=500)
+
+
+class ReportResult(BaseModel):
+    title: str
+    documents: list[str]
+    overview: str
+    key_findings: list[str]
+    risks_or_gaps: list[str]
+    recommendations: list[str]
     truncated: bool
