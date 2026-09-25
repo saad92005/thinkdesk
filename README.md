@@ -46,15 +46,18 @@ yourself, and only when you click "Approve & post" does it actually reach
 Slack — the AI never sends anything without that explicit human step.
 Subscribe to a real plan via Lemon Squeezy checkout, and a workspace's
 billing status updates only from a signature-verified webhook — never
-guessed or set client-side. Full pytest suite (89 tests) covers all of the
-above and — the part that matters most for a multi-tenant app — that one
-organization's data is genuinely unreachable by another.
+guessed or set client-side. The free plan is capped for real (3 documents,
+50 chat messages), enforced server-side, not just displayed — an active
+subscription lifts both automatically. Full pytest suite (94 tests) covers
+all of the above and — the part that matters most for a multi-tenant app —
+that one organization's data is genuinely unreachable by another.
 
 Billing note: **Stripe doesn't support Pakistan-based accounts**, so this
 project uses **Lemon Squeezy** instead (a Merchant of Record platform with
-no home-country restriction). Checkout creation and webhook handling are
-both built and tested; the one remaining step is creating an actual priced
-plan (a Product + Variant) in the Lemon Squeezy dashboard.
+no home-country restriction) — and it's been proven with a real purchase:
+a genuine test-mode checkout, a signed webhook delivered and verified, and
+the resulting subscription confirmed in both this app's database and Lemon
+Squeezy's own dashboard.
 
 One known, honestly-documented gap: `pgvector` is compiled and vendored
 but not yet installed into the running Postgres instance (needs one

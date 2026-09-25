@@ -4,6 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Up
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user
+from app.billing.limits import UsageLimitError, enforce_document_limit
 from app.database import get_db
 from app.documents.schemas import DocumentOut
 from app.documents.service import (
@@ -31,6 +32,11 @@ async def upload_document_route(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> DocumentOut:
+    try:
+        await enforce_document_limit(db, organization_id)
+    except UsageLimitError as exc:
+        raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED, str(exc))
+
     content = await file.read()
     try:
         document = await create_document(

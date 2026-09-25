@@ -520,3 +520,20 @@ export async function createCheckout(orgId: string): Promise<string> {
   const data = await response.json();
   return data.checkout_url;
 }
+
+export interface Usage {
+  is_paid_plan: boolean;
+  document_count: number;
+  document_limit: number | null;
+  message_count: number;
+  message_limit: number | null;
+}
+
+export async function getUsage(orgId: string): Promise<Usage> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/billing/usage`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}

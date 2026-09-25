@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user
-from app.billing import lemonsqueezy, service
-from app.billing.schemas import CheckoutResult, SubscriptionOut
+from app.billing import lemonsqueezy, limits, service
+from app.billing.schemas import CheckoutResult, SubscriptionOut, UsageOut
 from app.database import get_db
 from app.models.organization import OrganizationMember, OrganizationRole
 from app.models.user import User
@@ -45,6 +45,15 @@ async def get_subscription_route(
     if subscription is None:
         return None
     return SubscriptionOut.model_validate(subscription)
+
+
+@org_router.get("/usage", response_model=UsageOut)
+async def get_usage_route(
+    organization_id: uuid.UUID,
+    membership: OrganizationMember = Depends(get_organization_membership),
+    db: AsyncSession = Depends(get_db),
+) -> UsageOut:
+    return UsageOut(**await limits.get_usage(db, organization_id))
 
 
 @router.post("/billing/lemonsqueezy/webhook", status_code=status.HTTP_204_NO_CONTENT)

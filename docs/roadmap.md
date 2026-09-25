@@ -148,14 +148,34 @@ needs a human-approval step before it executes, not just before it's
 once their own OAuth credentials are supplied -- each is additional, not a
 redesign.
 
-## Phase 8 — SaaS — 🚧 Started (Lemon Squeezy billing)
+## Phase 8 — SaaS — 🚧 Started (Lemon Squeezy billing + usage limits)
 
-RBAC is partially in place via organization roles; usage tracking,
-analytics, and a public API remain not started. Billing is real, not a
-placeholder: **Stripe doesn't support Pakistan-based accounts**, so this
+RBAC is partially in place via organization roles; analytics and a public
+API remain not started. Billing and usage tracking are both real, not
+placeholders: **Stripe doesn't support Pakistan-based accounts**, so this
 project uses **Lemon Squeezy** instead (a Merchant of Record platform: no
 home-country restriction, handles global sales tax compliance, payouts via
 bank transfer/Payoneer/Wise).
+
+**Live-verified end-to-end, real money never moved but everything else
+was real**: created an actual Lemon Squeezy product/variant, completed a
+real test-mode checkout with a test card, confirmed the signed webhook
+delivery, and confirmed the database's `Subscription` row updated to
+`active` -- checked from both sides (this app's database, and Lemon
+Squeezy's own dashboard revenue numbers) and they agreed.
+
+**Usage limits (`app/billing/limits.py`)** tie the subscription status to
+actual enforcement, not just a nicer dashboard number: free-plan
+workspaces are capped at `FREE_DOCUMENT_LIMIT = 3` documents and
+`FREE_MESSAGE_LIMIT = 50` chat messages; a workspace with an
+active/trialing subscription skips both checks entirely. Enforced in
+`documents/router.py`'s upload route and `chat/router.py`'s send route,
+both returning `402 Payment Required` with a message naming the limit and
+pointing at the upgrade path -- not a generic 403. `GET
+/organizations/{id}/billing/usage` powers a Usage card on the billing page,
+computed with the exact same counting functions the enforcement checks
+use, so the displayed numbers can never drift from what's actually
+enforced. 5 new tests (94 total).
 
 - `app/billing/lemonsqueezy.py::create_checkout_url()` creates a real
   hosted Lemon Squeezy checkout session via their API, embedding the
@@ -184,12 +204,6 @@ bank transfer/Payoneer/Wise).
   Variant in the dashboard first" in the UI, rather than a raw 500 --
   exactly the fail-clearly pattern used everywhere else in this codebase.
 
-**One step left to make checkout actually work**: a Product + Variant
-(an actual priced plan) needs to exist in the Lemon Squeezy dashboard, and
-its variant ID goes in `LEMONSQUEEZY_VARIANT_ID`. The webhook receiver and
-signature verification are fully functional independent of that -- only
-the "start a checkout" half needs it.
-
 ---
 
 **Current focus:** Phases 1-4 are all fully complete — AI Knowledge
@@ -201,21 +215,22 @@ verification). Phase 7 (Integrations) has working Gmail and Slack
 connectors sharing one reusable OAuth architecture, Phase 5 (AI Agents)
 has its first real action (draft a Gmail summary, review it, explicitly
 approve before it's posted to Slack), and Phase 8 (SaaS) has real Lemon
-Squeezy billing wired up (checkout creation + signature-verified webhook
-handling). All of it tested end-to-end (89 backend tests) and verified
-live in a real browser session, not just unit tests -- including a real
-Playwright run where the LLM correctly marked a claim `verified` after
-finding it corroborated across two separate uploaded documents, real
-redirects to both Google's and Slack's actual consent screens, and a
-real ngrok tunnel confirmed reachable for Lemon Squeezy's webhook
-delivery. One known, clearly-flagged gap remains: `pgvector` needs one
+Squeezy billing plus enforced usage limits (checkout creation,
+signature-verified webhook handling, and free-plan document/message caps
+that a real subscription lifts). All of it tested end-to-end (94 backend
+tests) and verified live in a real browser session, not just unit tests --
+including a real Playwright run where the LLM correctly marked a claim
+`verified` after finding it corroborated across two separate uploaded
+documents, real redirects to both Google's and Slack's actual consent
+screens, and a complete real Lemon Squeezy purchase (test-mode card,
+real webhook delivery, database and dashboard agreeing on the result).
+One known, clearly-flagged gap remains: `pgvector` needs one
 elevated copy command to finish installing — see
 `backend/vendor/pgvector-win64/README.md`; the Python cosine + BM25 +
 reranking pipeline is correct in the meantime, just
 not indexed/scaled.
 
-Next up: create a Product + Variant in the Lemon Squeezy dashboard and set
-`LEMONSQUEEZY_VARIANT_ID` to actually complete a real subscription
-end-to-end (checkout -> webhook -> Subscription row). A second agent
-action, or a third connector (Notion's token is already stored, unused),
-follow the same now-proven patterns whenever prioritized.
+Next up: a second agent action, a third connector (Notion's token is
+already stored, unused), or Phase 6 automation (scoped honestly around the
+human-approval rule -- see that phase's notes above), all following the
+same now-proven patterns.

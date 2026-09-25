@@ -13,9 +13,11 @@ import {
   ApiError,
   createCheckout,
   getSubscription,
+  getUsage,
   type OrganizationRole,
   type Subscription,
   type SubscriptionStatus,
+  type Usage,
 } from "@/lib/api";
 import { useOrganization } from "@/lib/useOrganization";
 
@@ -40,6 +42,7 @@ export default function BillingPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const org = useOrganization(orgId);
   const [subscription, setSubscription] = useState<Subscription | null | undefined>(undefined);
+  const [usage, setUsage] = useState<Usage | null>(null);
   const [redirecting, setRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +50,9 @@ export default function BillingPage() {
     getSubscription(orgId)
       .then(setSubscription)
       .catch(() => setSubscription(null));
+    getUsage(orgId)
+      .then(setUsage)
+      .catch(() => {});
   }, [orgId]);
 
   async function handleSubscribe() {
@@ -87,6 +93,31 @@ export default function BillingPage() {
         </div>
 
         {error && <Alert>{error}</Alert>}
+
+        {usage && (
+          <Card className="flex flex-col gap-3 p-5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Usage</p>
+            <div className="flex flex-col gap-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-foreground">Documents</span>
+                <span className="text-muted">
+                  {usage.document_count}
+                  {usage.document_limit !== null ? ` / ${usage.document_limit}` : " (unlimited)"}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-foreground">Chat messages</span>
+                <span className="text-muted">
+                  {usage.message_count}
+                  {usage.message_limit !== null ? ` / ${usage.message_limit}` : " (unlimited)"}
+                </span>
+              </div>
+            </div>
+            {!usage.is_paid_plan && (
+              <p className="text-xs text-muted">Upgrade to Pro below for unlimited documents and chat.</p>
+            )}
+          </Card>
+        )}
 
         {subscription ? (
           <Card className="flex flex-col gap-3 p-5">

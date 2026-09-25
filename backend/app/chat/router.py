@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user
+from app.billing.limits import UsageLimitError, enforce_message_limit
 from app.chat.schemas import ChatRequest, ChatResponse, ConversationOut, MessageOut
 from app.chat.service import get_conversation_messages, list_conversations, send_message
 from app.database import get_db
@@ -22,6 +23,11 @@ async def chat_route(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ChatResponse:
+    try:
+        await enforce_message_limit(db, organization_id)
+    except UsageLimitError as exc:
+        raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED, str(exc))
+
     conversation, message = await send_message(
         db, organization_id, current_user, payload.conversation_id, payload.message
     )

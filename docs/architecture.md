@@ -326,6 +326,34 @@ reach `localhost`); this project uses ngrok's free tier for that, whose
 URL changes on every restart -- not suitable for anything beyond
 development.
 
+**Live-verified, not just unit-tested**: a real product/variant was
+created in the Lemon Squeezy dashboard, a real checkout was completed with
+a test-mode card, the resulting webhook was delivered through the ngrok
+tunnel and processed, and the resulting `Subscription` row was confirmed
+directly in the database -- matching what Lemon Squeezy's own dashboard
+reported (1 order, $9.99, 1 new subscription). Both sides of the
+integration agreeing independently is stronger evidence than either alone.
+
+### Usage limits (`app/billing/limits.py`)
+
+Ties the subscription status to actual enforcement, not just a nicer
+number on a dashboard:
+
+- `is_on_paid_plan()` checks whether the org's `Subscription` (if any) has
+  status `active` or `on_trial`.
+- `enforce_document_limit()` / `enforce_message_limit()` are called from
+  `documents/router.py`'s upload route and `chat/router.py`'s send route
+  respectively, *before* the underlying service function runs -- a
+  free-plan workspace at its cap gets a `402 Payment Required` naming the
+  limit and pointing at the upgrade path, and the document is never
+  created / the message is never sent. A paid-plan workspace skips the
+  count query entirely.
+- `get_usage()` powers the billing page's usage card using the exact same
+  counting helpers the enforcement functions call -- the displayed
+  "3 / 3 documents" can never disagree with what's actually enforced,
+  because it's computed by the same code, not a parallel implementation
+  that could drift.
+
 ### Database
 
 PostgreSQL 16, native Windows install (Docker isn't available on this
