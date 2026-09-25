@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bot, CreditCard, FileText, FlaskConical, MessageSquare, Plug, Search, Users } from "lucide-react";
 import { LogoMark } from "@/components/ui/logo";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/cn";
 
@@ -23,7 +22,7 @@ export function OrgNav({ orgId, orgName }: { orgId: string; orgName: string }) {
   ];
 
   return (
-    <header className="flex items-center justify-between border-b border-border px-6 py-3">
+    <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-background px-6 py-3">
       <div className="flex items-center gap-3 text-sm">
         <Link href="/app" className="flex items-center gap-2 text-muted transition-colors hover:text-foreground">
           <LogoMark className="h-6 w-6" />
@@ -42,7 +41,7 @@ export function OrgNav({ orgId, orgName }: { orgId: string; orgName: string }) {
                 href={link.href}
                 className={cn(
                   "flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors",
-                  active ? "bg-brand-soft text-brand" : "text-muted hover:bg-black/[.04] dark:hover:bg-white/[.06]"
+                  active ? "bg-brand-soft text-brand" : "text-muted hover:bg-black/[.04]"
                 )}
               >
                 <link.icon className="h-4 w-4" />
@@ -51,7 +50,6 @@ export function OrgNav({ orgId, orgName }: { orgId: string; orgName: string }) {
             );
           })}
         </nav>
-        <ThemeToggle />
         <UserMenu />
       </div>
     </header>

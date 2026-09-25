@@ -120,7 +120,7 @@ export default function ChatPage() {
                   "truncate rounded-md px-3 py-1.5 text-left text-sm transition-colors",
                   conversation.id === conversationId
                     ? "bg-brand-soft font-medium text-brand"
-                    : "text-muted hover:bg-black/[.04] dark:hover:bg-white/[.06]"
+                    : "text-muted hover:bg-black/[.04]"
                 )}
                 title={conversation.title}
               >

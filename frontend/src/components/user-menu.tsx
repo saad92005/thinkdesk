@@ -53,7 +53,7 @@ export function UserMenu() {
               router.push("/");
               router.refresh();
             }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-black/[.04] dark:hover:bg-white/[.06]"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-foreground hover:bg-black/[.04]"
           >
             <LogOut className="h-4 w-4" />
             Log out

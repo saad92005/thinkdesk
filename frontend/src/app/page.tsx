@@ -1,6 +1,5 @@
 import { FileSearch, GitMerge, Quote, ShieldCheck, Upload, MessagesSquare } from "lucide-react";
 import { AuthStatus } from "@/components/auth-status";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Logo } from "@/components/ui/logo";
 import { LinkButton } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -53,12 +52,9 @@ const STEPS = [
 export default function Home() {
   return (
     <>
-      <header className="flex items-center justify-between px-6 py-5 sm:px-10">
+      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-background px-6 py-5 sm:px-10">
         <Logo />
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-          <AuthStatus />
-        </div>
+        <AuthStatus />
       </header>
 
       <main className="flex-1">
