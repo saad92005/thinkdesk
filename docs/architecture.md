@@ -58,7 +58,7 @@ real job queue, `process_document`'s body moves into a task with the same
 signature, and the API contract (upload now, poll `document.status`)
 doesn't change.
 
-### Retrieval (Steps 11–12, hybrid search Step 17, reranking Step 18)
+### Retrieval (Steps 11–12, hybrid search Step 17, reranking Step 18, query rewriting Step 19)
 
 `app/retrieval/vector_store.py` fetches an organization's chunks (already
 filtered by `organization_id`, not trusted from the caller) and ranks them
@@ -81,15 +81,37 @@ together, without giving up semantic matching for paraphrased questions.
 Both `/search` and `/chat` go through `search()` in
 `app/retrieval/service.py`, so both benefit automatically.
 
-`search()` then **reranks**: it asks `hybrid_search()` for a wider
-candidate pool (`top_k * 4`, capped at 25 -- free, since hybrid search
-already scores every org chunk internally before truncating) and re-scores
-that shortlist with a local cross-encoder (`app/ai/reranker.py`, fastembed
-`Xenova/ms-marco-MiniLM-L-6-v2`, ~80MB, no API key). A cross-encoder scores
-the query and a candidate jointly, which is more precise than comparing
-two independently-computed embeddings, but too slow to run over an entire
-corpus -- which is exactly why it only touches the shortlist, not every
-chunk.
+Before any of that, `search()` **rewrites the query**
+(`app/retrieval/query_rewrite.py`): it asks the LLM for up to 2 alternate
+phrasings of the question (synonyms, expanded abbreviations, a more
+keyword-heavy version), runs hybrid search once per variant (original
+included), and merges the results by chunk id, keeping each chunk's best
+fusion score. This catches the common case where a user's wording shares
+little vocabulary with the source document (e.g. "refund policy" vs. a
+document that only says "reimbursement terms") -- something neither BM25
+nor a single embedding lookup can fix on their own. If no LLM is
+configured, or the rewrite call fails, `rewrite_query()` returns just the
+original query -- rewriting is a recall enhancement, never a hard
+dependency, so search degrades to exactly its pre-Step-19 behavior rather
+than breaking.
+
+`search()` then **reranks**: it takes the merged candidate pool (capped at
+25 -- free, since hybrid search already scores every org chunk internally
+before truncating) and re-scores it with a local cross-encoder
+(`app/ai/reranker.py`, fastembed `Xenova/ms-marco-MiniLM-L-6-v2`, ~80MB, no
+API key), scored against the *original* query -- rewrites widen what gets
+retrieved, but relevance is still judged against what the user actually
+asked. A cross-encoder scores the query and a candidate jointly, which is
+more precise than comparing two independently-computed embeddings, but too
+slow to run over an entire corpus -- which is exactly why it only touches
+the shortlist, not every chunk.
+
+One trade-off worth knowing: because `/search` and `/chat` share
+`search()`, a configured LLM key means every call to either endpoint now
+makes an extra LLM round trip for rewriting, on top of `/chat`'s own
+generation call. On Groq's free tier this is usually fine at V1's traffic
+levels, but it's a real added cost/latency/rate-limit consumer, not a free
+lunch.
 
 ### Chat + citations (Steps 13–15)
 
