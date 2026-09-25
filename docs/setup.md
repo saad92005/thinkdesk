@@ -83,12 +83,13 @@ pip install -r requirements-dev.txt
 pytest -v
 ```
 
-40 tests: chunking unit tests, auth security unit tests, the full signup/
+51 tests: chunking unit tests, auth security unit tests, the full signup/
 login/logout flow, tenant-isolation security tests, hybrid search ranking
 (BM25 + reciprocal rank fusion), reranking and query rewriting unit tests,
-document delete, member invites, and a full upload → process → search →
-chat round trip against a real (but generated, throwaway) PDF. Tests run
-against `thinkdesk_test`, not your working database.
+document delete, member invites/role editing/removal, RAG evaluation
+scoring, and a full upload → process → search → chat round trip against a
+real (but generated, throwaway) PDF. Tests run against `thinkdesk_test`,
+not your working database.
 
 ### 3. Frontend
 
@@ -100,6 +101,16 @@ npm run dev
 
 Visit http://localhost:3000. The homepage calls the backend `/health`
 endpoint client-side and displays the live status returned by the API.
+
+The frontend talks to the backend via `NEXT_PUBLIC_API_URL` (defaults to
+`http://localhost:8000` if unset). If you ever restart the backend on a
+different port -- for instance because Windows left a stale process still
+holding port 8000 (its `SO_REUSEADDR` behavior can let a new process bind
+a port a dead-but-not-yet-reaped process still appears to own, silently
+serving stale code from whichever process the OS happens to route a
+request to) -- set `NEXT_PUBLIC_API_URL` in `frontend/.env.local` to match
+and restart `npm run dev` (Next.js only reads `NEXT_PUBLIC_*` vars at
+startup, not on hot reload).
 
 ## Option B — Docker Compose
 

@@ -247,3 +247,36 @@ export async function getConversationMessages(orgId: string, conversationId: str
   if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
   return response.json();
 }
+
+export interface EvalCase {
+  question: string;
+  expected_keywords: string[];
+}
+
+export interface EvalCaseResult {
+  question: string;
+  answer: string;
+  retrieved_chunk_count: number;
+  retrieval_hit: boolean | null;
+  faithfulness: number | null;
+  relevance: number | null;
+  judge_notes: string | null;
+}
+
+export interface EvalReport {
+  results: EvalCaseResult[];
+  retrieval_hit_rate: number | null;
+  average_faithfulness: number | null;
+  average_relevance: number | null;
+}
+
+export async function runEvaluation(orgId: string, cases: EvalCase[]): Promise<EvalReport> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/evaluation/run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ cases }),
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}

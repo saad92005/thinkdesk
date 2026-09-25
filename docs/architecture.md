@@ -134,6 +134,32 @@ citations, conversation history) but returns a clear error message
 (`LLMNotConfiguredError` / `LLMGenerationError`) instead of crashing or
 fabricating an answer.
 
+### RAG evaluation (Step 20)
+
+`app/evaluation/` runs a set of test questions through the *exact same*
+retrieval + generation path a real chat message takes
+(`app.retrieval.service.search` and the shared prompts in
+`app.chat.prompts`) and scores the result two ways:
+
+- **Retrieval hit**: a deterministic check that at least one expected
+  keyword appears somewhere in the retrieved context. No LLM judgment
+  involved -- this can't be talked into a false pass.
+- **Faithfulness / relevance**: an LLM-as-judge call
+  (`app/evaluation/service.py::_judge_answer`) scores the generated answer
+  0.0-1.0 against the retrieved context, using a separate, narrowly-scoped
+  judge prompt. If the judge's response can't be parsed as the expected
+  JSON, or no LLM is configured, the score is reported as missing (`null`)
+  -- never defaulted to a fake pass or a made-up number.
+
+`POST /organizations/{id}/evaluation/run` (owner/admin/manager only, since
+each run costs LLM quota) takes an ad hoc list of test cases and returns a
+report with per-case results plus aggregate averages; `/app/[orgId]/evaluation`
+is the UI for building a case set and reading the results. There's
+deliberately no persisted "eval case library" yet -- each run is
+self-contained, which is enough to answer "did my last retrieval/prompt
+change help or hurt," the main thing an evaluation framework needs to do
+at this stage.
+
 ### Database
 
 PostgreSQL 16, native Windows install (Docker isn't available on this

@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { LogOut, Trash2, UserPlus } from "lucide-react";
 import { OrgNav } from "@/components/org-nav";
@@ -27,6 +27,7 @@ const CAN_MANAGE: OrganizationRole[] = ["owner", "admin"];
 
 export default function MembersPage() {
   const { orgId } = useParams<{ orgId: string }>();
+  const router = useRouter();
   const org = useOrganization(orgId);
   const [members, setMembers] = useState<Member[] | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -80,7 +81,7 @@ export default function MembersPage() {
     try {
       await removeMember(orgId, userId);
       setMembers((prev) => (prev ?? []).filter((m) => m.user_id !== userId));
-      if (isSelf) window.location.href = "/app";
+      if (isSelf) router.push("/app");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not remove member");
       setBusyUserId(null);

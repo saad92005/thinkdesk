@@ -14,19 +14,22 @@ pieces fit together.
 
 ## Current status
 
-**Phase 1 (V1) — AI Knowledge Assistant — functionally complete**, plus
-hybrid search, reranking, and query rewriting (Phase 2, Steps 17–19).
-Signup → login → create workspace → upload a PDF → it gets extracted,
-chunked, and embedded locally (no API key needed) → ask a question → the
-LLM rewrites it into alternate phrasings to widen recall, retrieval fuses
-vector + BM25 keyword search across all phrasings (Reciprocal Rank
-Fusion), then reranks with a local cross-encoder → Groq generates a real
-grounded answer with citations → chat history is saved and browsable
-across past conversations. Invite teammates (if they already have an
-account) and manage roles per workspace. Full pytest suite (40 tests)
-covers chunking, auth, hybrid search + reranking + query rewriting, and —
-the part that matters most for a multi-tenant app — that one
-organization's data is genuinely unreachable by another.
+**Phase 1 (V1) — AI Knowledge Assistant — functionally complete, and Phase
+2 — Advanced RAG — also fully complete** (hybrid search, reranking, query
+rewriting, RAG evaluation). Signup → login → create workspace → upload a
+PDF → it gets extracted, chunked, and embedded locally (no API key needed)
+→ ask a question → the LLM rewrites it into alternate phrasings to widen
+recall, retrieval fuses vector + BM25 keyword search across all phrasings
+(Reciprocal Rank Fusion), then reranks with a local cross-encoder → Groq
+generates a real grounded answer with citations → chat history is saved
+and browsable across past conversations. Invite teammates (if they already
+have an account), edit roles, or remove members per workspace. Run a RAG
+evaluation against your own documents and get real retrieval-hit and
+LLM-judged faithfulness/relevance scores, not a guess. Full pytest suite
+(51 tests) covers chunking, auth, hybrid search + reranking + query
+rewriting, evaluation scoring, and — the part that matters most for a
+multi-tenant app — that one organization's data is genuinely unreachable
+by another.
 
 One known, honestly-documented gap: `pgvector` is compiled and vendored
 but not yet installed into the running Postgres instance (needs one
