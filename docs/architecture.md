@@ -196,6 +196,32 @@ and surface a clear "unavailable" error rather than a guess if it doesn't
 parse. A document that hasn't finished processing yet (no chunks) is
 rejected with a 409, not silently compared against nothing.
 
+### Research mode (Phase 4)
+
+`app/research/` answers a free-text topic by researching *across the
+whole knowledge base*, unlike Phase 3's comparison/report features where
+the user picks specific documents. `research_topic()` runs the topic
+through the same retrieval pipeline chat uses (`app.retrieval.service.search`,
+hybrid + rerank + query-rewrite) with a wider candidate pool
+(`RESEARCH_TOP_K = 15`), then asks the LLM to produce findings, each one
+required to name which numbered excerpt(s) support it.
+
+The one place this deliberately extends ThinkDesk's usual "citations are
+built from real retrieval results, never parsed from the LLM's claims"
+rule: the LLM does choose *which* of the given excerpts back a specific
+finding. That's a narrower trust boundary than it sounds -- every citable
+excerpt is still a real, retrieved chunk (the LLM cannot invent a
+citation's content), an out-of-range or missing excerpt number is silently
+dropped, and a finding left with zero valid citations after that
+validation is discarded entirely rather than shown ungrounded.
+
+**Source verification is computed by ThinkDesk, not self-reported by the
+LLM**: after validating a finding's citations, the code counts how many
+*distinct documents* they span. Two or more -> `verified`. Exactly one ->
+`single_source`. The LLM is never asked for a confidence score, because an
+LLM's self-rated confidence is not a fact -- corroboration across
+independently-uploaded documents is.
+
 ### Database
 
 PostgreSQL 16, native Windows install (Docker isn't available on this

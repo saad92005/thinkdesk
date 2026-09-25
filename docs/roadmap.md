@@ -43,10 +43,20 @@ Also since V1: **document deletion** (`DELETE /organizations/{id}/documents/{id}
 | Structured data extraction | ✅ Done — `POST /organizations/{id}/documents/{document_id}/extract` pulls key facts (dates, amounts, parties, obligations) as label/value pairs, grounded strictly in the document's own text; a sparkle button per document on the documents page |
 | Report generation | ✅ Done — `POST /organizations/{id}/documents/report` synthesizes up to 5 documents (with an optional focus area) into a structured report: title, overview, key findings, risks/gaps, recommendations, all grounded in the source text |
 
-## Phase 4 — Research Mode
+## Phase 4 — Research Mode — ✅ Complete
 
-Multi-document research with source verification and structured reports.
-Not started.
+`POST /organizations/{id}/research` takes a free-text topic (not a
+user-picked document set) and researches it across the *entire* knowledge
+base: retrieval (`app/retrieval/service.py::search`, the same hybrid +
+rerank + query-rewrite pipeline chat uses) pulls a wide candidate pool,
+then the LLM produces findings, each required to cite the specific
+retrieved excerpts that support it. Source verification is computed
+deterministically, not self-reported by the LLM: a finding backed by
+excerpts from 2+ distinct documents is marked `verified`, one backed by
+only one document is `single_source` — an honest signal about how
+corroborated each claim actually is. A `gaps` list surfaces what the
+topic asks that the knowledge base doesn't actually cover. `/app/[orgId]/research`
+is the UI. 4 new backend tests (64 total).
 
 ## Phase 5 — AI Agents
 
@@ -72,24 +82,23 @@ provider (e.g. Stripe) account before it can be wired up for real.
 
 ---
 
-**Current focus:** Phase 2 (Advanced RAG) and Phase 3 (Document
-Intelligence) are both fully complete — hybrid search, reranking, query
-rewriting, RAG evaluation, document comparison + contradiction detection,
-structured extraction, and multi-document report generation. All of it
-tested end-to-end, including real LLM-generated answers (Groq
-`openai/gpt-oss-120b`), real LLM-judged evaluation scores, a real
-LLM-generated comparison correctly catching a planted contradiction
-between two test documents, and a real multi-document report correctly
-synthesizing a focused finding across them -- verified live in a real
-browser session, not just unit tests. One known, clearly-flagged gap
-remains: `pgvector` needs one elevated copy command to finish installing —
-see `backend/vendor/pgvector-win64/README.md`; the Python cosine + BM25 +
-reranking pipeline is correct in the meantime, just not indexed/scaled.
+**Current focus:** Phases 1-4 are all fully complete — AI Knowledge
+Assistant, Advanced RAG (hybrid search, reranking, query rewriting, RAG
+evaluation), Document Intelligence (comparison, contradiction detection,
+extraction, report generation), and Research Mode (topic-driven research
+across the whole knowledge base with deterministic multi-source
+verification). All of it tested end-to-end and verified live in a real
+browser session, not just unit tests -- including a real Playwright run
+where the LLM correctly marked a claim `verified` after finding it
+corroborated across two separate uploaded documents. One known,
+clearly-flagged gap remains: `pgvector` needs one elevated copy command to
+finish installing — see `backend/vendor/pgvector-win64/README.md`; the
+Python cosine + BM25 + reranking pipeline is correct in the meantime, just
+not indexed/scaled.
 
-Next up: Phase 4 (Research Mode — multi-document research with source
-verification and structured reports) builds naturally on what Phase 3
-just delivered, and is credential-free. Phases 5–7 (agents with real
-external tools, automation on real external services, integrations) need
-credentials/accounts this session cannot create — those should be scoped
-with the project owner before implementation starts, per the master
-brief's own rule against building ahead of what can actually be verified.
+Next up: Phases 5–7 (AI agents with real external tools, automation on
+real external services, third-party integrations like Gmail/Slack) and
+Phase 8 (billing) all need credentials/accounts only the project owner can
+create -- OAuth app registrations, API keys, a payment provider account.
+None of that can be built without those in hand first; see the project
+owner's own notes on what's needed for each.

@@ -9,6 +9,7 @@ from app.documents.router import router as documents_router
 from app.evaluation.router import router as evaluation_router
 from app.intelligence.router import router as intelligence_router
 from app.organizations.router import router as organizations_router
+from app.research.router import router as research_router
 from app.retrieval.router import router as retrieval_router
 
 settings = get_settings()
@@ -41,6 +42,7 @@ app.include_router(retrieval_router)
 app.include_router(chat_router)
 app.include_router(evaluation_router)
 app.include_router(intelligence_router)
+app.include_router(research_router)
 
 
 @app.get("/")

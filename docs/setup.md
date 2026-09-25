@@ -83,14 +83,14 @@ pip install -r requirements-dev.txt
 pytest -v
 ```
 
-60 tests: chunking unit tests, auth security unit tests, the full signup/
+64 tests: chunking unit tests, auth security unit tests, the full signup/
 login/logout flow, tenant-isolation security tests, hybrid search ranking
 (BM25 + reciprocal rank fusion), reranking and query rewriting unit tests,
 document delete, member invites/role editing/removal, RAG evaluation
-scoring, document comparison/extraction/report generation, and a full
-upload → process → search → chat round trip against a real (but
-generated, throwaway) PDF. Tests run against `thinkdesk_test`, not your
-working database.
+scoring, document comparison/extraction/report generation, research mode's
+source-verification logic, and a full upload → process → search → chat
+round trip against a real (but generated, throwaway) PDF. Tests run
+against `thinkdesk_test`, not your working database.
 
 ### 3. Frontend
 

@@ -254,6 +254,39 @@ export async function generateReport(orgId: string, documentIds: string[], focus
   return response.json();
 }
 
+export interface ResearchCitation {
+  chunk_id: string;
+  document_id: string;
+  filename: string;
+  page_number: number | null;
+  snippet: string;
+}
+
+export interface ResearchFinding {
+  claim: string;
+  confidence: "verified" | "single_source";
+  citations: ResearchCitation[];
+}
+
+export interface ResearchReport {
+  topic: string;
+  summary: string;
+  findings: ResearchFinding[];
+  gaps: string[];
+  documents_used: string[];
+}
+
+export async function runResearch(orgId: string, topic: string): Promise<ResearchReport> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/research`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ topic }),
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
 export interface Citation {
   chunk_id: string;
   document_id: string;
