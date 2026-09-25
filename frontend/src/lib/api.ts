@@ -287,7 +287,7 @@ export async function runResearch(orgId: string, topic: string): Promise<Researc
   return response.json();
 }
 
-export type ConnectorProvider = "google" | "slack";
+export type ConnectorProvider = "google" | "slack" | "notion";
 
 export interface Connector {
   id: string;
@@ -323,6 +323,33 @@ export async function deleteConnector(orgId: string, connectorId: string): Promi
     credentials: "include",
   });
   if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+}
+
+export async function connectNotion(orgId: string, token: string): Promise<Connector> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/connectors/notion`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ token }),
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
+export interface NotionPage {
+  id: string;
+  object: string;
+  title: string;
+  url: string;
+}
+
+export async function listConnectorPages(orgId: string, connectorId: string): Promise<NotionPage[]> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/connectors/${connectorId}/pages`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
 }
 
 export interface EmailMessage {

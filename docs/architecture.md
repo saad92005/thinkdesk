@@ -222,10 +222,10 @@ LLM**: after validating a finding's citations, the code counts how many
 LLM's self-rated confidence is not a fact -- corroboration across
 independently-uploaded documents is.
 
-### Connectors (Phase 7): Gmail and Slack
+### Connectors (Phase 7): Gmail, Slack, and Notion
 
-`app/connectors/` is a reusable pattern for third-party OAuth
-integrations, proven out by actually adding a second provider:
+`app/connectors/` is a reusable pattern for third-party integrations,
+proven out across **two different auth models**, not just repeated OAuth:
 
 - `crypto.py` -- Fernet encryption for tokens at rest, keyed by
   `CONNECTOR_ENCRYPTION_KEY`. `ConnectorEncryptionNotConfiguredError` if
@@ -233,32 +233,56 @@ integrations, proven out by actually adding a second provider:
   than a plaintext fallback or a crash.
 - `oauth_state.py` -- a single-use, short-lived (10 min) in-memory nonce
   store tying an OAuth "state" round trip to the organization and user
-  that started it. This is CSRF protection scoped honestly to what it
-  actually is: enough for a single-process dev/demo deployment, explicitly
-  not enough for multiple workers (which don't share process memory) --
-  that would need the same nonce in Redis or the database instead.
-- `google_oauth.py` / `slack_oauth.py` -- the provider-specific halves
+  that started it (Google and Slack only -- Notion has no OAuth step).
+  This is CSRF protection scoped honestly to what it actually is: enough
+  for a single-process dev/demo deployment, explicitly not enough for
+  multiple workers (which don't share process memory) -- that would need
+  the same nonce in Redis or the database instead.
+- `google_oauth.py` / `slack_oauth.py` -- the OAuth provider halves
   (authorize URL, token exchange, list-data call). `router.py`'s
   `_consume_state_or_403()` helper is what both providers' callback routes
   share -- the state/CSRF validation logic is written once, not
   copy-pasted per provider.
+- `notion_client.py` -- **no OAuth at all**. Notion's internal-integration
+  tokens are pasted directly by the user (from their own Notion integration
+  settings); `verify_token()` calls Notion's real API to confirm the token
+  works and to derive a human-readable label, since these tokens don't
+  carry one the way an OAuth response does. Reuses the exact same
+  `ConnectorAccount` model, `crypto.py`, and `service.upsert_connection()`
+  as the OAuth providers -- adding a token-based provider needed zero
+  changes to the shared machinery, which is the actual proof the
+  architecture is reusable, not just repeated.
 - `ConnectorAccount` (`app/models/connector.py`) -- one row per connected
   account, scoped to `organization_id` like every other tenant-owned
   table. Its human-readable identifier column is named `account_label`,
-  not `account_email` -- Slack has a workspace name, not an email address,
-  and the schema shouldn't quietly assume every future provider looks like
-  Google.
+  not `account_email` -- Slack and Notion have workspace names, not email
+  addresses, and the schema shouldn't quietly assume every future provider
+  looks like Google.
 
-Both connectors are deliberately **read-only**: Gmail with
+All three connectors are deliberately **read-only**: Gmail with
 `gmail.readonly` (lists recent messages), Slack with `channels:read`
-(lists public channels). Sending, deleting, posting, or modifying anything
-is Phase 5 (AI Agents) territory, and per the master brief's own rule, any
-such action needs an explicit human-approval step before it executes --
-that's a genuinely different, not-yet-built feature, not an oversight in
-either connector. Slack bot tokens also don't expire the way Google's do,
-so `get_valid_access_token()` only attempts a refresh for Google accounts
--- a Slack `ConnectorAccount` never has `token_expires_at` set, so it
-always takes the "return the stored token" path.
+(lists public channels), Notion with its read-only search endpoint (lists
+pages/databases actually shared with the integration -- an empty list is
+the honest, expected state until the user shares something, not a bug).
+Sending, deleting, posting, or modifying anything is Phase 5 (AI Agents)
+territory, and per the master brief's own rule, any such action needs an
+explicit human-approval step before it executes -- that's a genuinely
+different, not-yet-built feature, not an oversight in any connector.
+Slack and Notion tokens also don't expire the way Google's do, so
+`get_valid_access_token()` only attempts a refresh for Google accounts --
+those `ConnectorAccount` rows never have `token_expires_at` set, so they
+always take the "return the stored token" path.
+
+**A real bug this caught**: the migrations adding Slack's and Notion's
+enum values used lowercase labels ('slack', 'notion'), but SQLAlchemy's
+`Enum` column type serializes a Python str-Enum by its member *name*
+by default ('SLACK', 'NOTION') -- matching the original 'GOOGLE' label.
+Invisible in the test suite (its database is rebuilt fresh from the
+current models every run, so it was always self-consistent), this only
+surfaced as a clear Postgres error on the first real connection attempt
+against the incrementally-migrated dev database. Fixed with a follow-up
+`ALTER TYPE ... RENAME VALUE` migration rather than editing the
+already-applied ones.
 
 ### Agents (Phase 5): a real propose/approve/execute loop
 

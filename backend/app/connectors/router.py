@@ -5,9 +5,16 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user
-from app.connectors import google_oauth, oauth_state, service, slack_oauth
+from app.connectors import google_oauth, notion_client, oauth_state, service, slack_oauth
 from app.connectors.crypto import ConnectorEncryptionNotConfiguredError
-from app.connectors.schemas import AuthorizeUrlOut, ConnectorOut, EmailMessageOut, SlackChannelOut
+from app.connectors.schemas import (
+    AuthorizeUrlOut,
+    ConnectNotionRequest,
+    ConnectorOut,
+    EmailMessageOut,
+    NotionPageOut,
+    SlackChannelOut,
+)
 from app.core.config import get_settings
 from app.database import get_db
 from app.models.connector import ConnectorProvider
@@ -81,6 +88,62 @@ async def slack_authorize_route(
     except slack_oauth.SlackOAuthNotConfiguredError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc))
     return AuthorizeUrlOut(authorize_url=url)
+
+
+@org_router.post("/notion", response_model=ConnectorOut, status_code=status.HTTP_201_CREATED)
+async def connect_notion_route(
+    organization_id: uuid.UUID,
+    payload: ConnectNotionRequest,
+    membership: OrganizationMember = Depends(get_organization_membership),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ConnectorOut:
+    """Notion's internal-integration tokens aren't OAuth -- there's no
+    authorize/callback dance, just a token the user pastes in from their
+    own Notion integration settings. We still verify it against Notion's
+    API before storing it, rather than trusting it blindly."""
+    if membership.role not in MANAGE_CONNECTORS_ROLES:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only owners and admins can connect integrations")
+
+    try:
+        info = await notion_client.verify_token(payload.token)
+    except notion_client.NotionTokenInvalidError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+    except notion_client.NotionError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc))
+
+    account = await service.upsert_connection(
+        db,
+        organization_id,
+        current_user.id,
+        ConnectorProvider.NOTION,
+        info["label"],
+        access_token=payload.token,
+        refresh_token=None,
+        expires_in=None,
+        scopes="",
+    )
+    return ConnectorOut.model_validate(account)
+
+
+@org_router.get("/{connector_id}/pages", response_model=list[NotionPageOut])
+async def list_notion_pages_route(
+    organization_id: uuid.UUID,
+    connector_id: uuid.UUID,
+    membership: OrganizationMember = Depends(get_organization_membership),
+    db: AsyncSession = Depends(get_db),
+) -> list[NotionPageOut]:
+    account = await service.get_connection(db, organization_id, connector_id)
+    if account is None or account.provider != ConnectorProvider.NOTION:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Notion connector not found in this workspace")
+
+    try:
+        access_token = await service.get_valid_access_token(db, account)
+        pages = await notion_client.search_pages(access_token)
+    except (notion_client.NotionError, ConnectorEncryptionNotConfiguredError) as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Could not read Notion: {exc}")
+
+    return [NotionPageOut(**p) for p in pages]
 
 
 @org_router.delete("/{connector_id}", status_code=status.HTTP_204_NO_CONTENT)

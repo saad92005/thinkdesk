@@ -108,45 +108,67 @@ generation can run unattended, but anything Phase 5 currently gates
 or is scoped to something genuinely safe enough to pre-approve as a
 standing policy. Not deciding this by default-approving everything.
 
-## Phase 7 — Integrations — 🚧 Started (Gmail + Slack connectors)
+## Phase 7 — Integrations — 🚧 Started (Gmail + Slack + Notion connectors)
 
-Reusable connector architecture (`app/connectors/`), proven out with two
-real integrations sharing the same machinery:
+Reusable connector architecture (`app/connectors/`), proven out with three
+real integrations across two different auth models:
 
-- **OAuth flow**: `GET /organizations/{id}/connectors/{google|slack}/authorize`
+- **OAuth flow** (Google, Slack): `GET /organizations/{id}/connectors/{google|slack}/authorize`
   builds a real consent URL for the given provider; `GET /connectors/{provider}/callback`
   exchanges the returned code for tokens and stores the connection. Both
   callbacks share one CSRF-validation helper (`_consume_state_or_403`) --
   the state/nonce logic (`app/connectors/oauth_state.py`) was written once,
   not copy-pasted. Documented as single-process-only; a multi-worker
   deployment would need the nonce store in Redis instead.
+- **Direct token** (Notion): `POST /organizations/{id}/connectors/notion`
+  takes a pasted internal-integration token (no OAuth dance -- Notion's
+  internal integrations don't have one), verifies it against Notion's real
+  API before storing it (never trusted blindly), and uses the response to
+  derive a human-readable label since Notion's tokens don't carry one.
+  Proves the connector architecture isn't OAuth-specific: adding a
+  token-based provider needed zero changes to `crypto.py`, `service.py`,
+  or the `ConnectorAccount` model.
 - **Encrypted token storage**: access/refresh tokens are Fernet-encrypted
   (`app/connectors/crypto.py`) before being written to the
   `connector_accounts` table, decrypted only in memory when a call to the
   provider's API needs them. Missing encryption key -> clear error, not a
   crash or a plaintext fallback. The account identifier column is named
-  `account_label` (not `account_email`) since Slack's identifier is a
-  workspace name, not an email.
-- **Read-only actions**: `GET /organizations/{id}/connectors/{id}/emails`
-  lists recent Gmail messages, auto-refreshing the access token first if
-  expired; `GET /organizations/{id}/connectors/{id}/channels` lists public
-  Slack channels (Slack bot tokens don't need refreshing).
-- `/app/[orgId]/connectors` UI: connect either provider, view emails or
-  channels, disconnect.
-- 16 connector-related backend tests (76 total), mocking Google's/Slack's
-  HTTP endpoints (no real accounts exercised in CI) -- the actual OAuth
-  consent click-throughs were verified live in a real browser: Google's
-  genuine "Sign in to continue to Thinkdesk" screen, and Slack's genuine
-  "Sign in to your workspace" screen, both reached via the correct
-  `client_id` for each provider's real registered app.
+  `account_label` (not `account_email`) since Slack's/Notion's identifiers
+  are workspace names, not emails.
+- **Read-only actions**: `GET .../connectors/{id}/emails` lists recent
+  Gmail messages (auto-refreshing the token first if expired); `.../channels`
+  lists public Slack channels; `.../pages` lists Notion pages/databases
+  actually shared with the integration (an empty result is the honest,
+  expected state until the user shares something from Notion's own
+  "Connections" menu -- not a bug).
+- `/app/[orgId]/connectors` UI: connect any of the three, view their data,
+  disconnect.
+- 20 connector-related backend tests (98 total across the whole suite),
+  mostly mocking each provider's HTTP endpoints -- plus one test that hits
+  the *real* Notion API with the actual configured token, and the Notion
+  connect flow was verified fully live end-to-end via Playwright (no OAuth
+  wall to block automation), correctly showing the real workspace name
+  "Saad Shahid's Space."
+
+**Bug caught and fixed during this**: the two `ALTER TYPE ... ADD VALUE`
+migrations for Slack and Notion added lowercase enum labels ('slack',
+'notion'), but SQLAlchemy's `Enum` column type actually serializes a Python
+str-Enum by its member *name* by default ('SLACK', 'NOTION'), matching the
+original 'GOOGLE' label from the first migration. This was invisible in
+the test suite (its database is rebuilt fresh from the current models
+every run) and only surfaced on the first real end-to-end Notion
+connection attempt against the incrementally-migrated dev database, with a
+clear Postgres error rather than silent data corruption. Fixed with a
+follow-up migration (`ALTER TYPE ... RENAME VALUE`), not by editing
+already-applied migrations.
 
 **Deliberately not built yet**: any action that sends, deletes, posts, or
-modifies anything (scopes are `gmail.readonly` / `channels:read` only) --
-that's Phase 5's job, and per the master brief's own rule, any such action
-needs a human-approval step before it executes, not just before it's
-"available." Notion, Outlook, and other connectors follow the same pattern
-once their own OAuth credentials are supplied -- each is additional, not a
-redesign.
+modifies anything (scopes are `gmail.readonly` / `channels:read` /
+read-only Notion search) -- that's Phase 5's job, and per the master
+brief's own rule, any such action needs a human-approval step before it
+executes, not just before it's "available." Outlook and other connectors
+follow the same pattern once their own credentials are supplied -- each is
+additional, not a redesign.
 
 ## Phase 8 — SaaS — 🚧 Started (Lemon Squeezy billing + usage limits)
 
@@ -211,26 +233,26 @@ Assistant, Advanced RAG (hybrid search, reranking, query rewriting, RAG
 evaluation), Document Intelligence (comparison, contradiction detection,
 extraction, report generation), and Research Mode (topic-driven research
 across the whole knowledge base with deterministic multi-source
-verification). Phase 7 (Integrations) has working Gmail and Slack
-connectors sharing one reusable OAuth architecture, Phase 5 (AI Agents)
-has its first real action (draft a Gmail summary, review it, explicitly
-approve before it's posted to Slack), and Phase 8 (SaaS) has real Lemon
-Squeezy billing plus enforced usage limits (checkout creation,
-signature-verified webhook handling, and free-plan document/message caps
-that a real subscription lifts). All of it tested end-to-end (94 backend
-tests) and verified live in a real browser session, not just unit tests --
-including a real Playwright run where the LLM correctly marked a claim
-`verified` after finding it corroborated across two separate uploaded
-documents, real redirects to both Google's and Slack's actual consent
-screens, and a complete real Lemon Squeezy purchase (test-mode card,
-real webhook delivery, database and dashboard agreeing on the result).
-One known, clearly-flagged gap remains: `pgvector` needs one
-elevated copy command to finish installing — see
+verification). Phase 7 (Integrations) has working Gmail, Slack, and Notion
+connectors sharing one reusable architecture across two different auth
+models, Phase 5 (AI Agents) has its first real action (draft a Gmail
+summary, review it, explicitly approve before it's posted to Slack), and
+Phase 8 (SaaS) has real Lemon Squeezy billing plus enforced usage limits
+(checkout creation, signature-verified webhook handling, and free-plan
+document/message caps that a real subscription lifts). All of it tested
+end-to-end (98 backend tests) and verified live in a real browser session,
+not just unit tests -- including a real Playwright run where the LLM
+correctly marked a claim `verified` after finding it corroborated across
+two separate uploaded documents, real redirects to Google's and Slack's
+actual consent screens, a fully-automated live Notion connection (correctly
+showing the real workspace name), and a complete real Lemon Squeezy
+purchase (test-mode card, real webhook delivery, database and dashboard
+agreeing on the result). One known, clearly-flagged gap remains:
+`pgvector` needs one elevated copy command to finish installing — see
 `backend/vendor/pgvector-win64/README.md`; the Python cosine + BM25 +
 reranking pipeline is correct in the meantime, just
 not indexed/scaled.
 
-Next up: a second agent action, a third connector (Notion's token is
-already stored, unused), or Phase 6 automation (scoped honestly around the
-human-approval rule -- see that phase's notes above), all following the
-same now-proven patterns.
+Next up: a second agent action (e.g. summarizing a Notion page), or Phase
+6 automation (scoped honestly around the human-approval rule -- see that
+phase's notes above), following the same now-proven patterns.

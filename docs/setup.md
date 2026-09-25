@@ -83,23 +83,24 @@ pip install -r requirements-dev.txt
 pytest -v
 ```
 
-94 tests: chunking unit tests, auth security unit tests, the full signup/
+98 tests: chunking unit tests, auth security unit tests, the full signup/
 login/logout flow, tenant-isolation security tests, hybrid search ranking
 (BM25 + reciprocal rank fusion), reranking and query rewriting unit tests,
 document delete, member invites/role editing/removal, RAG evaluation
 scoring, document comparison/extraction/report generation, research mode's
-source-verification logic, the Gmail and Slack connectors' OAuth flows,
-the email-summary agent action's propose/approve/execute split, Lemon
-Squeezy webhook signature verification and subscription upsert logic, and
-free-plan usage limit enforcement (all mocked against
-Google/Slack/Lemon Squeezy, no real accounts needed in CI), plus a full
+source-verification logic, the Gmail/Slack/Notion connectors, the
+email-summary agent action's propose/approve/execute split, Lemon Squeezy
+webhook signature verification and subscription upsert logic, and
+free-plan usage limit enforcement (mostly mocked against
+Google/Slack/Lemon Squeezy, no real accounts needed in CI -- except one
+test that hits the real Notion API with a configured token), plus a full
 upload → process → search → chat round trip against a real
 (but generated, throwaway) PDF. Tests run against `thinkdesk_test`, not your
 working database.
 
 #### Enabling connectors (optional)
 
-Both connectors need the encryption key first (required for any connector
+All connectors need the encryption key first (required for any connector
 to work):
 ```
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -146,6 +147,18 @@ people besides your own test-user account to connect), you'll see an
 Note: Slack's "Your App Configuration Tokens" section (visible on the
 Your Apps page) is for the Slack CLI, unrelated to the OAuth Client ID/
 Secret this connector needs -- easy to confuse, ignore it.
+
+**Notion:** no OAuth setup needed.
+1. [notion.so/my-integrations](https://www.notion.so/my-integrations) →
+   **New integration** → name it → copy the token it gives you (starts
+   with `ntn_`)
+2. Paste that token directly into the Connectors page in the app -- there's
+   nothing to add to `backend/.env` for this one, since each workspace
+   connects with its own token, not a shared app-level credential
+3. In Notion itself, open any page you want ThinkDesk to see → **"..."
+   menu → Connections** → add your integration. Until you do this for at
+   least one page, the connector will correctly show "no pages shared
+   yet" -- that's expected, not an error.
 
 #### Enabling billing (optional)
 

@@ -11,6 +11,7 @@ from app.database import Base
 class ConnectorProvider(str, enum.Enum):
     GOOGLE = "google"
     SLACK = "slack"
+    NOTION = "notion"
 
 
 class ConnectorAccount(Base):

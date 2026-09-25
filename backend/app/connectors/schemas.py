@@ -32,3 +32,14 @@ class SlackChannelOut(BaseModel):
     name: str
     is_member: bool
     num_members: int | None
+
+
+class ConnectNotionRequest(BaseModel):
+    token: str
+
+
+class NotionPageOut(BaseModel):
+    id: str
+    object: str
+    title: str
+    url: str

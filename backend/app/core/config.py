@@ -50,6 +50,13 @@ class Settings(BaseSettings):
     slack_client_secret: str | None = None
     slack_redirect_uri: str = "http://localhost:8000/connectors/slack/callback"
 
+    # Notion connector (Phase 7). An internal integration token from
+    # notion.so/my-integrations -- not OAuth, so there's no client
+    # id/secret pair. This is only used by the dev-environment live-check
+    # test; each real workspace pastes in its own token via the API,
+    # stored per-organization like any other connector.
+    notion_api_key: str | None = None
+
     # Symmetric key (Fernet) used to encrypt connector OAuth tokens at rest.
     # Generate once with:
     #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
