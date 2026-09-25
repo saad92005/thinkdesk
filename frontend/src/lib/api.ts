@@ -358,6 +358,48 @@ export async function listConnectorChannels(orgId: string, connectorId: string):
   return response.json();
 }
 
+export interface DraftEmailSummary {
+  draft_text: string;
+  source_email_count: number;
+}
+
+export async function draftEmailSummary(
+  orgId: string,
+  gmailConnectorId: string,
+  maxResults = 10
+): Promise<DraftEmailSummary> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/agent/draft-email-summary`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ gmail_connector_id: gmailConnectorId, max_results: maxResults }),
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
+export interface PostToSlackResult {
+  posted: boolean;
+  channel_id: string;
+  slack_ts: string;
+}
+
+export async function postToSlack(
+  orgId: string,
+  slackConnectorId: string,
+  channelId: string,
+  message: string
+): Promise<PostToSlackResult> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/agent/post-to-slack`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ slack_connector_id: slackConnectorId, channel_id: channelId, message }),
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
 export interface Citation {
   chunk_id: string;
   document_id: string;

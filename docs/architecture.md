@@ -260,6 +260,36 @@ so `get_valid_access_token()` only attempts a refresh for Google accounts
 -- a Slack `ConnectorAccount` never has `token_expires_at` set, so it
 always takes the "return the stored token" path.
 
+### Agents (Phase 5): a real propose/approve/execute loop
+
+`app/agents/` builds directly on the connectors above. It's deliberately
+two separate endpoints, not one "do the thing" call, because the split
+*is* the safety mechanism:
+
+- `draft_email_summary()` (read-only) fetches Gmail messages and asks the
+  LLM to summarize them. It cannot post, send, or modify anything -- there
+  is no code path from this function to any external write.
+- `post_to_slack()` (the only write) takes an exact message string and a
+  channel and posts it. It has no awareness that a "draft" ever existed --
+  it posts whatever text it's handed. The only reason approved text ever
+  reaches it is that the frontend puts the draft in an editable textarea
+  and requires an explicit "Approve & post" click, which calls a
+  completely separate endpoint gated to owner/admin.
+
+This means "skip the approval step" isn't a flag to flip or a code path
+to bypass -- doing so would require calling `post_to_slack()` directly
+with attacker-chosen text, which is exactly the same shape as any other
+Slack-posting bug, not a special "agent bypassed its safety check" case.
+The safety property comes from there being no function that both drafts
+and posts.
+
+`slack_oauth.py::post_message()` is the only call site in the codebase
+that writes to Slack, by design -- if a second write action is ever added
+(e.g. creating a Slack reminder, sending a Gmail reply), it should be
+similarly isolated: one narrow function, one clear "this is where external
+state changes" comment, reachable only after an equivalent human-approval
+gate.
+
 ### Database
 
 PostgreSQL 16, native Windows install (Docker isn't available on this

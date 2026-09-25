@@ -58,16 +58,55 @@ corroborated each claim actually is. A `gaps` list surfaces what the
 topic asks that the knowledge base doesn't actually cover. `/app/[orgId]/research`
 is the UI. 4 new backend tests (64 total).
 
-## Phase 5 — AI Agents
+## Phase 5 — AI Agents — 🚧 Started (Gmail-to-Slack summary agent)
 
-Tool use, planning, permission-checked execution, human approval. Not
-started -- this is the layer that would sit on top of Phase 7's connectors
-(below), turning "read my Gmail" into "plan and take an action on my
-Gmail, with my approval first."
+`app/agents/` is the first genuine agent action: tool use (Gmail + Slack
+connectors), planning (an LLM call that turns raw emails into a draft),
+and permission-checked, human-approved execution -- the three things this
+phase's definition calls for, actually built, not stubbed.
+
+The flow is a strict two-step propose/approve/execute loop, split across
+two separate endpoints so the "execute" step can never be reached
+accidentally:
+
+1. `POST /organizations/{id}/agent/draft-email-summary` -- **read-only**.
+   Fetches recent Gmail messages through the existing connector and asks
+   the LLM to summarize them. Returns the draft text. Nothing is sent or
+   posted anywhere; this step alone cannot have any external effect.
+2. `POST /organizations/{id}/agent/post-to-slack` -- **the only write**.
+   Takes an exact message string and posts it to a chosen Slack channel.
+   It has no concept of "the draft" -- it posts whatever text it's given,
+   which only reaches it because the UI puts that text in an editable box
+   and requires an explicit "Approve & post" click first. Gated to
+   owner/admin, unlike the read-only draft step.
+
+`slack_oauth.py::post_message()` is the only place in the codebase that
+ever writes to Slack, and its docstring says so -- a deliberate,
+findable choke point rather than a capability sprinkled around. Slack's
+bot scope grew to `channels:read,chat:write` to support this. New
+`/app/[orgId]/agent` UI walks through both steps. 5 new backend tests (81
+total), including one asserting the exact human-edited text is what
+actually gets sent -- not a re-fetched or re-generated version.
+
+**Deliberately not built**: anything that runs without a human clicking
+"Approve" first -- that would violate the master brief's own rule, not
+just be an early version of a future feature. See Phase 6 for what
+"automation" can honestly mean without breaking that rule.
 
 ## Phase 6 — Automation
 
 Triggers, conditions, AI processing, actions. Not started.
+
+Worth flagging now, before it's built: "automation" (running unattended,
+e.g. on a schedule) is in real tension with Phase 5's per-action
+human-approval rule -- an unattended pipeline has no human standing by to
+click "Approve." The honest way to reconcile them, when this gets built,
+is approving a *rule* once (e.g. "always OK to draft a daily summary")
+rather than skipping approval for the resulting *actions* -- draft
+generation can run unattended, but anything Phase 5 currently gates
+(actually posting/sending) either still waits for a per-instance approval,
+or is scoped to something genuinely safe enough to pre-approve as a
+standing policy. Not deciding this by default-approving everything.
 
 ## Phase 7 — Integrations — 🚧 Started (Gmail + Slack connectors)
 
@@ -129,22 +168,22 @@ evaluation), Document Intelligence (comparison, contradiction detection,
 extraction, report generation), and Research Mode (topic-driven research
 across the whole knowledge base with deterministic multi-source
 verification). Phase 7 (Integrations) has working Gmail and Slack
-connectors sharing one reusable OAuth architecture. All of it tested
-end-to-end and verified live in a real browser session, not just unit
-tests -- including a real Playwright run where the LLM correctly marked a
-claim `verified` after finding it corroborated across two separate
-uploaded documents, and real redirects to both Google's and Slack's actual
-consent screens using this project's real registered OAuth clients. One
-known, clearly-flagged gap remains: `pgvector` needs one elevated copy
-command to finish installing — see
+connectors sharing one reusable OAuth architecture, and Phase 5 (AI
+Agents) has its first real action: draft a Gmail summary, review it, and
+explicitly approve before it's posted to Slack. All of it tested
+end-to-end (81 backend tests) and verified live in a real browser session,
+not just unit tests -- including a real Playwright run where the LLM
+correctly marked a claim `verified` after finding it corroborated across
+two separate uploaded documents, and real redirects to both Google's and
+Slack's actual consent screens using this project's real registered OAuth
+clients. One known, clearly-flagged gap remains: `pgvector` needs one
+elevated copy command to finish installing — see
 `backend/vendor/pgvector-win64/README.md`; the Python cosine + BM25 +
 reranking pipeline is correct in the meantime, just
 not indexed/scaled.
 
-Next up: with Google OAuth, Slack OAuth, and Lemon Squeezy credentials now
-in hand, either (a) Lemon Squeezy checkout + webhook integration (Phase 8's
-real first slice, needs one more credential: a webhook signing secret), or
-(b) a genuine Phase 5 agent action on top of either connector (with a
-human-approval step before anything irreversible). Each further
-connector/integration still needs its own OAuth credentials from the
-project owner first.
+Next up: Lemon Squeezy checkout + webhook integration (Phase 8's real
+first slice) -- all three credentials (API key, store ID, webhook signing
+secret) are now in hand. A second agent action, or a third connector
+(Notion's token is already stored, unused), follow the same now-proven
+patterns whenever prioritized.

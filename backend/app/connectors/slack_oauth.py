@@ -7,12 +7,13 @@ from app.core.config import get_settings
 AUTHORIZE_URL = "https://slack.com/oauth/v2/authorize"
 TOKEN_URL = "https://slack.com/api/oauth.v2.access"
 CONVERSATIONS_LIST_URL = "https://slack.com/api/conversations.list"
+POST_MESSAGE_URL = "https://slack.com/api/chat.postMessage"
 
-# Read-only-equivalent: this connector lists channels, it never posts on
-# its own. A future "post an update" agent action would need chat:write
-# used for an actual send, plus, per the project's own rule, a human
-# approval step before that message actually goes out.
-BOT_SCOPES = "channels:read"
+# chat:write enables post_message() below -- used only by the agent
+# action's send step (app/agents/service.py::post_to_slack), which is
+# reached only after a human explicitly approves the drafted text. Slack
+# wants a comma-separated scope list, unlike Google's space-separated one.
+BOT_SCOPES = "channels:read,chat:write"
 
 
 class SlackOAuthNotConfiguredError(Exception):
@@ -81,3 +82,19 @@ async def list_channels(access_token: str, limit: int = 20) -> list[dict]:
         }
         for c in body.get("channels", [])
     ]
+
+
+async def post_message(access_token: str, channel: str, text: str) -> dict:
+    """The only place this codebase ever writes to Slack. Callers must
+    only reach this after a human has explicitly approved `text` -- see
+    app/agents/router.py's post-to-slack route, which is the sole caller."""
+    async with httpx.AsyncClient(timeout=15) as client:
+        response = await client.post(
+            POST_MESSAGE_URL,
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"channel": channel, "text": text},
+        )
+    body = response.json()
+    if response.status_code != 200 or not body.get("ok"):
+        raise SlackOAuthError(f"Posting message failed: {body.get('error', response.text)}")
+    return body

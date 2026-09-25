@@ -16,9 +16,12 @@ pieces fit together.
 
 **Phases 1 through 4 are all fully complete**: AI Knowledge Assistant,
 Advanced RAG, Document Intelligence, and Research Mode. **Phase 7
-(Integrations) has working Gmail and Slack connectors** — real OAuth
-flows, encrypted token storage, and a reusable connector architecture
-other integrations (Notion, Outlook, ...) can follow. Signup → login →
+(Integrations) has working Gmail and Slack connectors**, and **Phase 5 (AI
+Agents) has its first real action** built on top of them — real OAuth
+flows, encrypted token storage, a reusable connector architecture other
+integrations (Notion, Outlook, ...) can follow, and a genuine
+propose-review-approve-execute agent loop, not a demo that skips the
+approval step. Signup → login →
 create workspace → upload a PDF → it gets extracted, chunked, and embedded
 locally (no API key needed) → ask a question → the LLM rewrites it into
 alternate phrasings to widen recall, retrieval fuses vector + BM25 keyword
@@ -35,10 +38,12 @@ Research any topic across your *entire* knowledge base and get findings
 that are marked `verified` only when independently corroborated by two or
 more separate documents — not the LLM's own opinion of its confidence, an
 actually-computed signal. Connect a Gmail account and read recent messages, or connect Slack and
-list its channels — both read-only, since sending, posting, or deleting
-anything is an agent capability with a required approval step, not built
-yet. Full pytest suite (76 tests) covers all of the above and — the part
-that matters most for a multi-tenant app — that one organization's data is
+list its channels — both read-only by default. On top of that, ask the
+agent to draft a summary of your recent emails, review and edit it
+yourself, and only when you click "Approve & post" does it actually reach
+Slack — the AI never sends anything without that explicit human step.
+Full pytest suite (81 tests) covers all of the above and — the part that
+matters most for a multi-tenant app — that one organization's data is
 genuinely unreachable by another.
 
 Billing note: **Stripe doesn't support Pakistan-based accounts**, so this
