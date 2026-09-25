@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FileText, FlaskConical, MessageSquare, Search, Users } from "lucide-react";
+import { FileText, FlaskConical, MessageSquare, Plug, Search, Users } from "lucide-react";
 import { LogoMark } from "@/components/ui/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserMenu } from "@/components/user-menu";
@@ -17,6 +17,7 @@ export function OrgNav({ orgId, orgName }: { orgId: string; orgName: string }) {
     { href: `/app/${orgId}/research`, label: "Research", icon: Search },
     { href: `/app/${orgId}/members`, label: "Members", icon: Users },
     { href: `/app/${orgId}/evaluation`, label: "Evaluation", icon: FlaskConical },
+    { href: `/app/${orgId}/connectors`, label: "Connectors", icon: Plug },
   ];
 
   return (

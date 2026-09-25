@@ -83,14 +83,44 @@ pip install -r requirements-dev.txt
 pytest -v
 ```
 
-64 tests: chunking unit tests, auth security unit tests, the full signup/
+72 tests: chunking unit tests, auth security unit tests, the full signup/
 login/logout flow, tenant-isolation security tests, hybrid search ranking
 (BM25 + reciprocal rank fusion), reranking and query rewriting unit tests,
 document delete, member invites/role editing/removal, RAG evaluation
 scoring, document comparison/extraction/report generation, research mode's
-source-verification logic, and a full upload → process → search → chat
-round trip against a real (but generated, throwaway) PDF. Tests run
-against `thinkdesk_test`, not your working database.
+source-verification logic, the Gmail connector's OAuth flow (mocked
+against Google, no real account needed in CI), and a full upload → process
+→ search → chat round trip against a real (but generated, throwaway) PDF.
+Tests run against `thinkdesk_test`, not your working database.
+
+#### Enabling the Gmail connector (optional)
+
+1. [Google Cloud Console](https://console.cloud.google.com) → new project
+   → **APIs & Services → Library** → enable "Gmail API"
+2. **APIs & Services → OAuth consent screen** → configure (External user
+   type is fine) → add your own email under test users
+3. **APIs & Services → Credentials → Create Credentials → OAuth client
+   ID** → Application type **Web application** → add redirect URI
+   `http://localhost:8000/connectors/google/callback`
+4. Copy the Client ID and Client Secret into `backend/.env`:
+   ```
+   GOOGLE_CLIENT_ID=...
+   GOOGLE_CLIENT_SECRET=...
+   ```
+5. Generate a token-encryption key (required for any connector to work)
+   and add it too:
+   ```
+   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+   CONNECTOR_ENCRYPTION_KEY=...
+   ```
+6. Apply the migration that adds the connectors table:
+   ```
+   alembic upgrade head
+   ```
+
+Until Google reviews the OAuth consent screen (only needed once you want
+people besides your own test-user account to connect), you'll see an
+"unverified app" warning during connect -- expected, click through it.
 
 ### 3. Frontend
 

@@ -287,6 +287,56 @@ export async function runResearch(orgId: string, topic: string): Promise<Researc
   return response.json();
 }
 
+export interface Connector {
+  id: string;
+  provider: "google";
+  account_email: string;
+  created_at: string;
+}
+
+export async function listConnectors(orgId: string): Promise<Connector[]> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/connectors`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
+export async function getGoogleAuthorizeUrl(orgId: string): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/connectors/google/authorize`, {
+    credentials: "include",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  const data = await response.json();
+  return data.authorize_url;
+}
+
+export async function deleteConnector(orgId: string, connectorId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/connectors/${connectorId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+}
+
+export interface EmailMessage {
+  id: string;
+  subject: string;
+  sender: string;
+  date: string;
+  snippet: string;
+}
+
+export async function listConnectorEmails(orgId: string, connectorId: string): Promise<EmailMessage[]> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/connectors/${connectorId}/emails`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
 export interface Citation {
   chunk_id: string;
   document_id: string;

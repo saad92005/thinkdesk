@@ -16,6 +16,8 @@ class Settings(BaseSettings):
 
     # Comma-separated list of allowed frontend origins for CORS.
     cors_origins: str = "http://localhost:3000"
+    # Where to redirect the browser back to after an OAuth connector flow.
+    frontend_base_url: str = "http://localhost:3000"
 
     session_cookie_name: str = "thinkdesk_session"
     session_ttl_days: int = 7
@@ -33,6 +35,28 @@ class Settings(BaseSettings):
     # with your key lists what's currently servable.
     groq_api_key: str | None = None
     groq_model: str = "openai/gpt-oss-120b"
+
+    # Google OAuth (Gmail connector, Phase 5). Get these from a Google Cloud
+    # Console project's OAuth client (Web application type) -- see
+    # docs/setup.md. Left unset until configured; connector routes return a
+    # clear error instead of crashing when missing.
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+    google_redirect_uri: str = "http://localhost:8000/connectors/google/callback"
+
+    # Symmetric key (Fernet) used to encrypt connector OAuth tokens at rest.
+    # Generate once with:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # and never rotate without a migration plan -- rotating invalidates
+    # every already-stored token.
+    connector_encryption_key: str | None = None
+
+    # Lemon Squeezy billing (Phase 8) -- Merchant of Record, works without a
+    # Stripe-supported home country. API key from Settings > API in the
+    # Lemon Squeezy dashboard; store ID from GET /v1/stores.
+    lemonsqueezy_api_key: str | None = None
+    lemonsqueezy_store_id: str | None = None
+    lemonsqueezy_webhook_secret: str | None = None
 
     @property
     def cors_origin_list(self) -> list[str]:
