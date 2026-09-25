@@ -9,11 +9,12 @@ from app.connectors.crypto import decrypt, encrypt
 from app.models.connector import ConnectorAccount, ConnectorProvider
 
 
-async def upsert_google_connection(
+async def upsert_connection(
     db: AsyncSession,
     organization_id: uuid.UUID,
     connected_by_user_id: uuid.UUID,
-    account_email: str,
+    provider: ConnectorProvider,
+    account_label: str,
     access_token: str,
     refresh_token: str | None,
     expires_in: int | None,
@@ -22,8 +23,8 @@ async def upsert_google_connection(
     existing = await db.scalar(
         select(ConnectorAccount).where(
             ConnectorAccount.organization_id == organization_id,
-            ConnectorAccount.provider == ConnectorProvider.GOOGLE,
-            ConnectorAccount.account_email == account_email,
+            ConnectorAccount.provider == provider,
+            ConnectorAccount.account_label == account_label,
         )
     )
     expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in) if expires_in else None
@@ -42,8 +43,8 @@ async def upsert_google_connection(
     account = ConnectorAccount(
         organization_id=organization_id,
         connected_by_user_id=connected_by_user_id,
-        provider=ConnectorProvider.GOOGLE,
-        account_email=account_email,
+        provider=provider,
+        account_label=account_label,
         access_token_encrypted=encrypt(access_token),
         refresh_token_encrypted=encrypt(refresh_token) if refresh_token else None,
         token_expires_at=expires_at,
@@ -93,7 +94,9 @@ async def get_valid_access_token(db: AsyncSession, account: ConnectorAccount) ->
     if account.token_expires_at is None or account.token_expires_at > now + timedelta(seconds=60):
         return decrypt(account.access_token_encrypted)
 
-    if not account.refresh_token_encrypted:
+    if not account.refresh_token_encrypted or account.provider != ConnectorProvider.GOOGLE:
+        # Only Google's tokens in this codebase expire and carry a refresh
+        # token; Slack bot tokens don't need this path at all.
         return decrypt(account.access_token_encrypted)
 
     refreshed = await google_oauth.refresh_access_token(decrypt(account.refresh_token_encrypted))

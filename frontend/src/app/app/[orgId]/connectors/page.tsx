@@ -2,7 +2,7 @@
 
 import { useParams, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { Mail, Plug, Trash2 } from "lucide-react";
+import { Hash, Mail, Plug, Trash2 } from "lucide-react";
 import { OrgNav } from "@/components/org-nav";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -12,25 +12,35 @@ import {
   ApiError,
   deleteConnector,
   getGoogleAuthorizeUrl,
+  getSlackAuthorizeUrl,
+  listConnectorChannels,
   listConnectorEmails,
   listConnectors,
   type Connector,
   type EmailMessage,
   type OrganizationRole,
+  type SlackChannel,
 } from "@/lib/api";
 import { useOrganization } from "@/lib/useOrganization";
 
 const CAN_MANAGE: OrganizationRole[] = ["owner", "admin"];
+
+type ExpandedData = { kind: "emails"; items: EmailMessage[] } | { kind: "channels"; items: SlackChannel[] };
+
+const PROVIDER_META = {
+  google: { icon: Mail, label: "Gmail (read-only)" },
+  slack: { icon: Hash, label: "Slack (read-only)" },
+} as const;
 
 export default function ConnectorsPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const searchParams = useSearchParams();
   const org = useOrganization(orgId);
   const [connectors, setConnectors] = useState<Connector[] | null>(null);
-  const [connecting, setConnecting] = useState(false);
+  const [connectingProvider, setConnectingProvider] = useState<"google" | "slack" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [emailsByConnector, setEmailsByConnector] = useState<Record<string, EmailMessage[]>>({});
-  const [loadingEmailsId, setLoadingEmailsId] = useState<string | null>(null);
+  const [expandedByConnector, setExpandedByConnector] = useState<Record<string, ExpandedData>>({});
+  const [loadingId, setLoadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
@@ -41,23 +51,23 @@ export default function ConnectorsPage() {
     refresh();
   }, [refresh]);
 
-  const justConnected = searchParams.get("connected") === "google";
+  const justConnected = searchParams.get("connected");
 
-  async function handleConnectGoogle() {
+  async function handleConnect(provider: "google" | "slack") {
     setError(null);
-    setConnecting(true);
+    setConnectingProvider(provider);
     try {
-      const url = await getGoogleAuthorizeUrl(orgId);
+      const url = provider === "google" ? await getGoogleAuthorizeUrl(orgId) : await getSlackAuthorizeUrl(orgId);
       window.location.href = url;
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not start Google connection");
-      setConnecting(false);
+      setError(err instanceof ApiError ? err.message : `Could not start ${provider} connection`);
+      setConnectingProvider(null);
     }
   }
 
-  async function handleToggleEmails(connector: Connector) {
-    if (emailsByConnector[connector.id]) {
-      setEmailsByConnector((prev) => {
+  async function handleToggleExpanded(connector: Connector) {
+    if (expandedByConnector[connector.id]) {
+      setExpandedByConnector((prev) => {
         const next = { ...prev };
         delete next[connector.id];
         return next;
@@ -65,19 +75,24 @@ export default function ConnectorsPage() {
       return;
     }
     setError(null);
-    setLoadingEmailsId(connector.id);
+    setLoadingId(connector.id);
     try {
-      const emails = await listConnectorEmails(orgId, connector.id);
-      setEmailsByConnector((prev) => ({ ...prev, [connector.id]: emails }));
+      if (connector.provider === "google") {
+        const items = await listConnectorEmails(orgId, connector.id);
+        setExpandedByConnector((prev) => ({ ...prev, [connector.id]: { kind: "emails", items } }));
+      } else {
+        const items = await listConnectorChannels(orgId, connector.id);
+        setExpandedByConnector((prev) => ({ ...prev, [connector.id]: { kind: "channels", items } }));
+      }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not load emails");
+      setError(err instanceof ApiError ? err.message : "Could not load connector data");
     } finally {
-      setLoadingEmailsId(null);
+      setLoadingId(null);
     }
   }
 
   async function handleDelete(connector: Connector) {
-    if (!window.confirm(`Disconnect ${connector.account_email}?`)) return;
+    if (!window.confirm(`Disconnect ${connector.account_label}?`)) return;
     setDeletingId(connector.id);
     try {
       await deleteConnector(orgId, connector.id);
@@ -115,18 +130,28 @@ export default function ConnectorsPage() {
           </p>
         </div>
 
-        {justConnected && <Alert tone="info">Google account connected.</Alert>}
+        {justConnected && <Alert tone="info">{justConnected === "google" ? "Gmail" : "Slack"} connected.</Alert>}
         {error && <Alert>{error}</Alert>}
 
         {canManage && (
-          <Card className="p-4">
-            <Button onClick={handleConnectGoogle} disabled={connecting}>
-              {connecting ? <Spinner className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
-              Connect Gmail
-            </Button>
-            <p className="mt-2 text-xs text-muted">
-              You&apos;ll see Google&apos;s consent screen, and possibly an &quot;unverified app&quot; warning until
-              this app passes Google&apos;s review — that&apos;s expected during development.
+          <Card className="flex flex-col gap-3 p-4">
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => handleConnect("google")} disabled={connectingProvider !== null}>
+                {connectingProvider === "google" ? <Spinner className="h-4 w-4" /> : <Mail className="h-4 w-4" />}
+                Connect Gmail
+              </Button>
+              <Button
+                variant="secondary"
+                onClick={() => handleConnect("slack")}
+                disabled={connectingProvider !== null}
+              >
+                {connectingProvider === "slack" ? <Spinner className="h-4 w-4" /> : <Hash className="h-4 w-4" />}
+                Connect Slack
+              </Button>
+            </div>
+            <p className="text-xs text-muted">
+              Google may show an &quot;unverified app&quot; warning until this app passes Google&apos;s review —
+              that&apos;s expected during development. Click through it to continue.
             </p>
           </Card>
         )}
@@ -138,66 +163,92 @@ export default function ConnectorsPage() {
           </Card>
         ) : (
           <ul className="flex flex-col gap-2">
-            {connectors.map((connector) => (
-              <li key={connector.id}>
-                <Card className="flex flex-col gap-3 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <Mail className="h-5 w-5 text-muted" strokeWidth={1.5} />
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{connector.account_email}</p>
-                        <p className="text-xs text-muted">Gmail (read-only)</p>
+            {connectors.map((connector) => {
+              const meta = PROVIDER_META[connector.provider];
+              const Icon = meta.icon;
+              const expanded = expandedByConnector[connector.id];
+
+              return (
+                <li key={connector.id}>
+                  <Card className="flex flex-col gap-3 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <Icon className="h-5 w-5 text-muted" strokeWidth={1.5} />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{connector.account_label}</p>
+                          <p className="text-xs text-muted">{meta.label}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleToggleExpanded(connector)}
+                          disabled={loadingId === connector.id}
+                        >
+                          {loadingId === connector.id ? (
+                            <Spinner className="h-4 w-4" />
+                          ) : expanded ? (
+                            "Hide"
+                          ) : connector.provider === "google" ? (
+                            "View recent emails"
+                          ) : (
+                            "View channels"
+                          )}
+                        </Button>
+                        {canManage && (
+                          <button
+                            onClick={() => handleDelete(connector)}
+                            disabled={deletingId === connector.id}
+                            aria-label={`Disconnect ${connector.account_label}`}
+                            className="text-muted transition-colors hover:text-red-500 disabled:opacity-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => handleToggleEmails(connector)}
-                        disabled={loadingEmailsId === connector.id}
-                      >
-                        {loadingEmailsId === connector.id ? (
-                          <Spinner className="h-4 w-4" />
-                        ) : emailsByConnector[connector.id] ? (
-                          "Hide emails"
-                        ) : (
-                          "View recent emails"
-                        )}
-                      </Button>
-                      {canManage && (
-                        <button
-                          onClick={() => handleDelete(connector)}
-                          disabled={deletingId === connector.id}
-                          aria-label={`Disconnect ${connector.account_email}`}
-                          className="text-muted transition-colors hover:text-red-500 disabled:opacity-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
 
-                  {emailsByConnector[connector.id] && (
-                    <div className="flex flex-col gap-2 border-t border-border pt-3">
-                      {emailsByConnector[connector.id].length === 0 ? (
-                        <p className="text-sm italic text-muted">No recent messages.</p>
-                      ) : (
-                        emailsByConnector[connector.id].map((email) => (
-                          <div key={email.id} className="rounded-lg bg-surface p-3">
-                            <div className="flex items-baseline justify-between gap-2">
-                              <p className="text-sm font-medium text-foreground">{email.subject}</p>
-                              <p className="shrink-0 text-xs text-muted">{email.date}</p>
+                    {expanded && expanded.kind === "emails" && (
+                      <div className="flex flex-col gap-2 border-t border-border pt-3">
+                        {expanded.items.length === 0 ? (
+                          <p className="text-sm italic text-muted">No recent messages.</p>
+                        ) : (
+                          expanded.items.map((email) => (
+                            <div key={email.id} className="rounded-lg bg-surface p-3">
+                              <div className="flex items-baseline justify-between gap-2">
+                                <p className="text-sm font-medium text-foreground">{email.subject}</p>
+                                <p className="shrink-0 text-xs text-muted">{email.date}</p>
+                              </div>
+                              <p className="text-xs text-muted">{email.sender}</p>
+                              <p className="mt-1 text-sm text-muted">{email.snippet}</p>
                             </div>
-                            <p className="text-xs text-muted">{email.sender}</p>
-                            <p className="mt-1 text-sm text-muted">{email.snippet}</p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </Card>
-              </li>
-            ))}
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {expanded && expanded.kind === "channels" && (
+                      <div className="flex flex-col gap-2 border-t border-border pt-3">
+                        {expanded.items.length === 0 ? (
+                          <p className="text-sm italic text-muted">No public channels found.</p>
+                        ) : (
+                          expanded.items.map((channel) => (
+                            <div key={channel.id} className="flex items-center justify-between rounded-lg bg-surface p-3">
+                              <p className="text-sm font-medium text-foreground">#{channel.name}</p>
+                              <p className="text-xs text-muted">
+                                {channel.num_members !== null ? `${channel.num_members} members` : ""}
+                                {channel.is_member ? " · joined" : ""}
+                              </p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </Card>
+                </li>
+              );
+            })}
           </ul>
         )}
       </main>

@@ -287,10 +287,12 @@ export async function runResearch(orgId: string, topic: string): Promise<Researc
   return response.json();
 }
 
+export type ConnectorProvider = "google" | "slack";
+
 export interface Connector {
   id: string;
-  provider: "google";
-  account_email: string;
+  provider: ConnectorProvider;
+  account_label: string;
   created_at: string;
 }
 
@@ -303,14 +305,17 @@ export async function listConnectors(orgId: string): Promise<Connector[]> {
   return response.json();
 }
 
-export async function getGoogleAuthorizeUrl(orgId: string): Promise<string> {
-  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/connectors/google/authorize`, {
+async function getAuthorizeUrl(orgId: string, provider: ConnectorProvider): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/connectors/${provider}/authorize`, {
     credentials: "include",
   });
   if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
   const data = await response.json();
   return data.authorize_url;
 }
+
+export const getGoogleAuthorizeUrl = (orgId: string) => getAuthorizeUrl(orgId, "google");
+export const getSlackAuthorizeUrl = (orgId: string) => getAuthorizeUrl(orgId, "slack");
 
 export async function deleteConnector(orgId: string, connectorId: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/connectors/${connectorId}`, {
@@ -330,6 +335,22 @@ export interface EmailMessage {
 
 export async function listConnectorEmails(orgId: string, connectorId: string): Promise<EmailMessage[]> {
   const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/connectors/${connectorId}/emails`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
+export interface SlackChannel {
+  id: string;
+  name: string;
+  is_member: boolean;
+  num_members: number | null;
+}
+
+export async function listConnectorChannels(orgId: string, connectorId: string): Promise<SlackChannel[]> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/connectors/${connectorId}/channels`, {
     credentials: "include",
     cache: "no-store",
   });

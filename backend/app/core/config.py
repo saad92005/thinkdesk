@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     google_client_secret: str | None = None
     google_redirect_uri: str = "http://localhost:8000/connectors/google/callback"
 
+    # Slack OAuth (Slack connector, Phase 7). Create a "Blank app" at
+    # api.slack.com/apps -- see docs/setup.md.
+    slack_client_id: str | None = None
+    slack_client_secret: str | None = None
+    slack_redirect_uri: str = "http://localhost:8000/connectors/slack/callback"
+
     # Symmetric key (Fernet) used to encrypt connector OAuth tokens at rest.
     # Generate once with:
     #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"

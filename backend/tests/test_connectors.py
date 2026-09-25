@@ -1,4 +1,6 @@
-from app.connectors import google_oauth, oauth_state
+import uuid
+
+from app.connectors import google_oauth, oauth_state, slack_oauth
 
 
 async def _signup_and_get_org(client, email: str) -> tuple[str, str]:
@@ -62,7 +64,7 @@ async def test_callback_completes_and_creates_a_connector(client, monkeypatch):
     assert listing.status_code == 200
     accounts = listing.json()
     assert len(accounts) == 1
-    assert accounts[0]["account_email"] == "connected-account@gmail.com"
+    assert accounts[0]["account_label"] == "connected-account@gmail.com"
     assert accounts[0]["provider"] == "google"
 
 
@@ -124,3 +126,79 @@ async def test_list_recent_emails_and_delete_connector(client, monkeypatch):
 
     missing = await client.get(f"/organizations/{org_id}/connectors/{connector_id}/emails")
     assert missing.status_code == 404
+
+
+async def test_slack_authorize_returns_a_slack_url_for_owner(client):
+    org_id, _owner_id = await _signup_and_get_org(client, "conn_slack_owner1@example.com")
+
+    response = await client.get(f"/organizations/{org_id}/connectors/slack/authorize")
+
+    assert response.status_code == 200
+    url = response.json()["authorize_url"]
+    assert url.startswith("https://slack.com/oauth/v2/authorize?")
+    assert "client_id=" in url
+
+
+async def test_slack_callback_completes_and_creates_a_connector(client, monkeypatch):
+    org_id, user_id = await _signup_and_get_org(client, "conn_slack_owner2@example.com")
+
+    async def fake_exchange(code: str) -> dict:
+        return {
+            "ok": True,
+            "access_token": "xoxb-fake",
+            "scope": "channels:read",
+            "team": {"id": "T123", "name": "Ogem Systems"},
+        }
+
+    monkeypatch.setattr(slack_oauth, "exchange_code_for_token", fake_exchange)
+
+    nonce = oauth_state.create_state(uuid.UUID(org_id), uuid.UUID(user_id))
+    response = await client.get(
+        "/connectors/slack/callback", params={"code": "fake-code", "state": nonce}, follow_redirects=False
+    )
+
+    assert response.status_code in (302, 307)
+
+    accounts = (await client.get(f"/organizations/{org_id}/connectors")).json()
+    assert len(accounts) == 1
+    assert accounts[0]["provider"] == "slack"
+    assert accounts[0]["account_label"] == "Ogem Systems"
+
+
+async def test_slack_channels_are_listed_through_the_stored_connector(client, monkeypatch):
+    org_id, user_id = await _signup_and_get_org(client, "conn_slack_owner3@example.com")
+
+    async def fake_exchange(code: str) -> dict:
+        return {"ok": True, "access_token": "xoxb-fake", "scope": "channels:read", "team": {"name": "Ogem Systems"}}
+
+    async def fake_list_channels(access_token: str, limit: int = 20) -> list[dict]:
+        return [{"id": "C1", "name": "general", "is_member": True, "num_members": 5}]
+
+    monkeypatch.setattr(slack_oauth, "exchange_code_for_token", fake_exchange)
+    monkeypatch.setattr(slack_oauth, "list_channels", fake_list_channels)
+
+    nonce = oauth_state.create_state(uuid.UUID(org_id), uuid.UUID(user_id))
+    await client.get("/connectors/slack/callback", params={"code": "fake-code", "state": nonce}, follow_redirects=False)
+
+    connector_id = (await client.get(f"/organizations/{org_id}/connectors")).json()[0]["id"]
+
+    channels = await client.get(f"/organizations/{org_id}/connectors/{connector_id}/channels")
+    assert channels.status_code == 200
+    assert channels.json()[0]["name"] == "general"
+
+
+async def test_gmail_emails_route_rejects_a_slack_connector_id(client, monkeypatch):
+    org_id, user_id = await _signup_and_get_org(client, "conn_slack_owner4@example.com")
+
+    async def fake_exchange(code: str) -> dict:
+        return {"ok": True, "access_token": "xoxb-fake", "scope": "channels:read", "team": {"name": "Ogem Systems"}}
+
+    monkeypatch.setattr(slack_oauth, "exchange_code_for_token", fake_exchange)
+
+    nonce = oauth_state.create_state(uuid.UUID(org_id), uuid.UUID(user_id))
+    await client.get("/connectors/slack/callback", params={"code": "fake-code", "state": nonce}, follow_redirects=False)
+
+    connector_id = (await client.get(f"/organizations/{org_id}/connectors")).json()[0]["id"]
+
+    response = await client.get(f"/organizations/{org_id}/connectors/{connector_id}/emails")
+    assert response.status_code == 404

@@ -11,7 +11,7 @@ class ConnectorOut(BaseModel):
 
     id: uuid.UUID
     provider: ConnectorProvider
-    account_email: str
+    account_label: str
     created_at: datetime
 
 
@@ -25,3 +25,10 @@ class EmailMessageOut(BaseModel):
     sender: str
     date: str
     snippet: str
+
+
+class SlackChannelOut(BaseModel):
+    id: str
+    name: str
+    is_member: bool
+    num_members: int | None

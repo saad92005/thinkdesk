@@ -222,10 +222,10 @@ LLM**: after validating a finding's citations, the code counts how many
 LLM's self-rated confidence is not a fact -- corroboration across
 independently-uploaded documents is.
 
-### Connectors (Phase 7 groundwork)
+### Connectors (Phase 7): Gmail and Slack
 
 `app/connectors/` is a reusable pattern for third-party OAuth
-integrations, not a Gmail-specific one-off:
+integrations, proven out by actually adding a second provider:
 
 - `crypto.py` -- Fernet encryption for tokens at rest, keyed by
   `CONNECTOR_ENCRYPTION_KEY`. `ConnectorEncryptionNotConfiguredError` if
@@ -237,20 +237,28 @@ integrations, not a Gmail-specific one-off:
   actually is: enough for a single-process dev/demo deployment, explicitly
   not enough for multiple workers (which don't share process memory) --
   that would need the same nonce in Redis or the database instead.
-- `google_oauth.py` -- the Google-specific half (authorize URL, token
-  exchange, refresh, Gmail API calls). A second provider (Slack, Notion,
-  ...) means one more file shaped like this one, not a rewrite of the
-  connector/token-storage/state-nonce machinery around it.
+- `google_oauth.py` / `slack_oauth.py` -- the provider-specific halves
+  (authorize URL, token exchange, list-data call). `router.py`'s
+  `_consume_state_or_403()` helper is what both providers' callback routes
+  share -- the state/CSRF validation logic is written once, not
+  copy-pasted per provider.
 - `ConnectorAccount` (`app/models/connector.py`) -- one row per connected
   account, scoped to `organization_id` like every other tenant-owned
-  table.
+  table. Its human-readable identifier column is named `account_label`,
+  not `account_email` -- Slack has a workspace name, not an email address,
+  and the schema shouldn't quietly assume every future provider looks like
+  Google.
 
-The Gmail connector is deliberately **read-only**
-(`gmail.readonly` scope): it lists recent messages, nothing else. Sending,
-deleting, or modifying anything is Phase 5 (AI Agents) territory, and per
-the master brief's own rule, any such action needs an explicit
-human-approval step before it executes -- that's a genuinely different,
-not-yet-built feature, not an oversight in this connector.
+Both connectors are deliberately **read-only**: Gmail with
+`gmail.readonly` (lists recent messages), Slack with `channels:read`
+(lists public channels). Sending, deleting, posting, or modifying anything
+is Phase 5 (AI Agents) territory, and per the master brief's own rule, any
+such action needs an explicit human-approval step before it executes --
+that's a genuinely different, not-yet-built feature, not an oversight in
+either connector. Slack bot tokens also don't expire the way Google's do,
+so `get_valid_access_token()` only attempts a refresh for Google accounts
+-- a Slack `ConnectorAccount` never has `token_expires_at` set, so it
+always takes the "return the stored token" path.
 
 ### Database
 

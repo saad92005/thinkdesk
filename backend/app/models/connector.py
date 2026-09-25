@@ -10,17 +10,19 @@ from app.database import Base
 
 class ConnectorProvider(str, enum.Enum):
     GOOGLE = "google"
+    SLACK = "slack"
 
 
 class ConnectorAccount(Base):
-    """One connected third-party account (e.g. a Gmail inbox) for a
-    workspace. Tokens are stored encrypted (app/connectors/crypto.py) --
-    never in plaintext, even though they're only as safe as the database
-    they sit in either way; encryption at rest is table stakes, not a
-    substitute for real infrastructure security."""
+    """One connected third-party account (e.g. a Gmail inbox, a Slack
+    workspace) for a workspace. Tokens are stored encrypted
+    (app/connectors/crypto.py) -- never in plaintext, even though they're
+    only as safe as the database they sit in either way; encryption at
+    rest is table stakes, not a substitute for real infrastructure
+    security."""
 
     __tablename__ = "connector_accounts"
-    __table_args__ = (UniqueConstraint("organization_id", "provider", "account_email", name="uq_connector_account"),)
+    __table_args__ = (UniqueConstraint("organization_id", "provider", "account_label", name="uq_connector_account"),)
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     organization_id: Mapped[uuid.UUID] = mapped_column(
@@ -32,7 +34,11 @@ class ConnectorAccount(Base):
     provider: Mapped[ConnectorProvider] = mapped_column(
         Enum(ConnectorProvider, name="connector_provider"), nullable=False
     )
-    account_email: Mapped[str] = mapped_column(String(320), nullable=False)
+    # A human-readable identifier for the connected account -- an email
+    # address for Google, a workspace name for Slack. Not every provider
+    # has an "email," so this is deliberately generic rather than named
+    # after Google's specific concept.
+    account_label: Mapped[str] = mapped_column(String(320), nullable=False)
     access_token_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
     refresh_token_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

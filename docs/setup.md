@@ -83,18 +83,31 @@ pip install -r requirements-dev.txt
 pytest -v
 ```
 
-72 tests: chunking unit tests, auth security unit tests, the full signup/
+76 tests: chunking unit tests, auth security unit tests, the full signup/
 login/logout flow, tenant-isolation security tests, hybrid search ranking
 (BM25 + reciprocal rank fusion), reranking and query rewriting unit tests,
 document delete, member invites/role editing/removal, RAG evaluation
 scoring, document comparison/extraction/report generation, research mode's
-source-verification logic, the Gmail connector's OAuth flow (mocked
-against Google, no real account needed in CI), and a full upload → process
-→ search → chat round trip against a real (but generated, throwaway) PDF.
-Tests run against `thinkdesk_test`, not your working database.
+source-verification logic, the Gmail and Slack connectors' OAuth flows
+(mocked against Google/Slack, no real accounts needed in CI), and a full
+upload → process → search → chat round trip against a real (but
+generated, throwaway) PDF. Tests run against `thinkdesk_test`, not your
+working database.
 
-#### Enabling the Gmail connector (optional)
+#### Enabling connectors (optional)
 
+Both connectors need the encryption key first (required for any connector
+to work):
+```
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+CONNECTOR_ENCRYPTION_KEY=...
+```
+Then apply the migration that adds the connectors table:
+```
+alembic upgrade head
+```
+
+**Gmail:**
 1. [Google Cloud Console](https://console.cloud.google.com) → new project
    → **APIs & Services → Library** → enable "Gmail API"
 2. **APIs & Services → OAuth consent screen** → configure (External user
@@ -107,20 +120,29 @@ Tests run against `thinkdesk_test`, not your working database.
    GOOGLE_CLIENT_ID=...
    GOOGLE_CLIENT_SECRET=...
    ```
-5. Generate a token-encryption key (required for any connector to work)
-   and add it too:
-   ```
-   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-   CONNECTOR_ENCRYPTION_KEY=...
-   ```
-6. Apply the migration that adds the connectors table:
-   ```
-   alembic upgrade head
-   ```
 
 Until Google reviews the OAuth consent screen (only needed once you want
 people besides your own test-user account to connect), you'll see an
 "unverified app" warning during connect -- expected, click through it.
+
+**Slack:**
+1. [api.slack.com/apps](https://api.slack.com/apps) → **Create New App →
+   Blank app** (not "AI agent" or "Starter app" -- those add scopes/features
+   this connector doesn't use) → name it, pick a workspace
+2. **OAuth & Permissions** → **Redirect URLs** → add
+   `http://localhost:8000/connectors/slack/callback` → Save
+3. Same page → **Scopes → Bot Token Scopes** → add `channels:read` (and
+   `chat:write` later, once an agent action actually needs to post)
+4. **Basic Information → App Credentials** → copy Client ID and Client
+   Secret into `backend/.env`:
+   ```
+   SLACK_CLIENT_ID=...
+   SLACK_CLIENT_SECRET=...
+   ```
+
+Note: Slack's "Your App Configuration Tokens" section (visible on the
+Your Apps page) is for the Slack CLI, unrelated to the OAuth Client ID/
+Secret this connector needs -- easy to confuse, ignore it.
 
 ### 3. Frontend
 

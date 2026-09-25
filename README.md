@@ -16,9 +16,9 @@ pieces fit together.
 
 **Phases 1 through 4 are all fully complete**: AI Knowledge Assistant,
 Advanced RAG, Document Intelligence, and Research Mode. **Phase 7
-(Integrations) has a working Gmail connector** — real OAuth flow,
-encrypted token storage, and a reusable connector architecture other
-integrations (Slack, Notion, ...) can follow. Signup → login →
+(Integrations) has working Gmail and Slack connectors** — real OAuth
+flows, encrypted token storage, and a reusable connector architecture
+other integrations (Notion, Outlook, ...) can follow. Signup → login →
 create workspace → upload a PDF → it gets extracted, chunked, and embedded
 locally (no API key needed) → ask a question → the LLM rewrites it into
 alternate phrasings to widen recall, retrieval fuses vector + BM25 keyword
@@ -34,12 +34,12 @@ document, or generate a synthesized report across up to 5 documents.
 Research any topic across your *entire* knowledge base and get findings
 that are marked `verified` only when independently corroborated by two or
 more separate documents — not the LLM's own opinion of its confidence, an
-actually-computed signal. Connect a Gmail account and read recent messages
-through it — read-only, since sending or deleting anything is an agent
-capability with a required approval step, not built yet. Full pytest
-suite (72 tests) covers all of the above and — the part that matters most
-for a multi-tenant app — that one organization's data is genuinely
-unreachable by another.
+actually-computed signal. Connect a Gmail account and read recent messages, or connect Slack and
+list its channels — both read-only, since sending, posting, or deleting
+anything is an agent capability with a required approval step, not built
+yet. Full pytest suite (76 tests) covers all of the above and — the part
+that matters most for a multi-tenant app — that one organization's data is
+genuinely unreachable by another.
 
 Billing note: **Stripe doesn't support Pakistan-based accounts**, so this
 project is set up for **Lemon Squeezy** instead (a Merchant of Record

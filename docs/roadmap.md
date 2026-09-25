@@ -69,39 +69,44 @@ Gmail, with my approval first."
 
 Triggers, conditions, AI processing, actions. Not started.
 
-## Phase 7 — Integrations — 🚧 Started (Gmail connector)
+## Phase 7 — Integrations — 🚧 Started (Gmail + Slack connectors)
 
-Reusable connector architecture (`app/connectors/`) plus a first real
-integration:
+Reusable connector architecture (`app/connectors/`), proven out with two
+real integrations sharing the same machinery:
 
-- **OAuth flow**: `GET /organizations/{id}/connectors/google/authorize`
-  builds a real Google consent URL; `GET /connectors/google/callback`
-  exchanges the returned code for tokens and stores the connection.
-  CSRF protection via a single-use, short-lived server-side state nonce
-  (`app/connectors/oauth_state.py`) tied to the organization and user that
-  started the flow -- documented as single-process-only; a multi-worker
-  deployment would need this in Redis instead.
+- **OAuth flow**: `GET /organizations/{id}/connectors/{google|slack}/authorize`
+  builds a real consent URL for the given provider; `GET /connectors/{provider}/callback`
+  exchanges the returned code for tokens and stores the connection. Both
+  callbacks share one CSRF-validation helper (`_consume_state_or_403`) --
+  the state/nonce logic (`app/connectors/oauth_state.py`) was written once,
+  not copy-pasted. Documented as single-process-only; a multi-worker
+  deployment would need the nonce store in Redis instead.
 - **Encrypted token storage**: access/refresh tokens are Fernet-encrypted
   (`app/connectors/crypto.py`) before being written to the
   `connector_accounts` table, decrypted only in memory when a call to the
   provider's API needs them. Missing encryption key -> clear error, not a
-  crash or a plaintext fallback.
-- **Read-only Gmail action**: `GET /organizations/{id}/connectors/{id}/emails`
-  lists recent messages (subject/sender/date/snippet) via the Gmail API,
-  auto-refreshing the access token first if it's expired
-  (`service.py::get_valid_access_token`).
-- `/app/[orgId]/connectors` UI: connect, view recent emails, disconnect.
-- 8 new backend tests (72 total), mocking Google's HTTP endpoints (no real
-  Google account is exercised in CI) -- the actual OAuth consent
-  click-through was verified live in a real browser, landing on Google's
-  genuine "Sign in to continue to Thinkdesk" screen.
+  crash or a plaintext fallback. The account identifier column is named
+  `account_label` (not `account_email`) since Slack's identifier is a
+  workspace name, not an email.
+- **Read-only actions**: `GET /organizations/{id}/connectors/{id}/emails`
+  lists recent Gmail messages, auto-refreshing the access token first if
+  expired; `GET /organizations/{id}/connectors/{id}/channels` lists public
+  Slack channels (Slack bot tokens don't need refreshing).
+- `/app/[orgId]/connectors` UI: connect either provider, view emails or
+  channels, disconnect.
+- 16 connector-related backend tests (76 total), mocking Google's/Slack's
+  HTTP endpoints (no real accounts exercised in CI) -- the actual OAuth
+  consent click-throughs were verified live in a real browser: Google's
+  genuine "Sign in to continue to Thinkdesk" screen, and Slack's genuine
+  "Sign in to your workspace" screen, both reached via the correct
+  `client_id` for each provider's real registered app.
 
-**Deliberately not built yet**: any action that sends, deletes, or
-modifies anything (scope is `gmail.readonly` only) -- that's Phase 5's
-job, and per the master brief's own rule, any such action needs a
-human-approval step before it executes, not just before it's "available."
-Slack, Notion, Outlook, and other connectors follow the same pattern once
-their own OAuth credentials are supplied -- each is additional, not a
+**Deliberately not built yet**: any action that sends, deletes, posts, or
+modifies anything (scopes are `gmail.readonly` / `channels:read` only) --
+that's Phase 5's job, and per the master brief's own rule, any such action
+needs a human-approval step before it executes, not just before it's
+"available." Notion, Outlook, and other connectors follow the same pattern
+once their own OAuth credentials are supplied -- each is additional, not a
 redesign.
 
 ## Phase 8 — SaaS
@@ -123,22 +128,23 @@ Assistant, Advanced RAG (hybrid search, reranking, query rewriting, RAG
 evaluation), Document Intelligence (comparison, contradiction detection,
 extraction, report generation), and Research Mode (topic-driven research
 across the whole knowledge base with deterministic multi-source
-verification). Phase 7 (Integrations) has a working Gmail connector with a
-reusable OAuth architecture behind it. All of it tested end-to-end and
-verified live in a real browser session, not just unit tests -- including
-a real Playwright run where the LLM correctly marked a claim `verified`
-after finding it corroborated across two separate uploaded documents, and
-a real redirect to Google's own consent screen using this project's actual
-OAuth client. One known, clearly-flagged gap remains: `pgvector` needs one
-elevated copy command to finish installing — see
+verification). Phase 7 (Integrations) has working Gmail and Slack
+connectors sharing one reusable OAuth architecture. All of it tested
+end-to-end and verified live in a real browser session, not just unit
+tests -- including a real Playwright run where the LLM correctly marked a
+claim `verified` after finding it corroborated across two separate
+uploaded documents, and real redirects to both Google's and Slack's actual
+consent screens using this project's real registered OAuth clients. One
+known, clearly-flagged gap remains: `pgvector` needs one elevated copy
+command to finish installing — see
 `backend/vendor/pgvector-win64/README.md`; the Python cosine + BM25 +
 reranking pipeline is correct in the meantime, just
 not indexed/scaled.
 
-Next up: with Google OAuth and Lemon Squeezy credentials now in hand,
-either (a) Lemon Squeezy checkout + webhook integration (Phase 8's real
-first slice), or (b) a genuine Phase 5 agent action on top of the Gmail
-connector (with a human-approval step before anything irreversible), or
-(c) Slack as a second connector once its own app is created at
-api.slack.com/apps. Each additional connector/integration still needs its
-own OAuth credentials from the project owner first.
+Next up: with Google OAuth, Slack OAuth, and Lemon Squeezy credentials now
+in hand, either (a) Lemon Squeezy checkout + webhook integration (Phase 8's
+real first slice, needs one more credential: a webhook signing secret), or
+(b) a genuine Phase 5 agent action on top of either connector (with a
+human-approval step before anything irreversible). Each further
+connector/integration still needs its own OAuth credentials from the
+project owner first.
