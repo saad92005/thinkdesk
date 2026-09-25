@@ -83,13 +83,13 @@ pip install -r requirements-dev.txt
 pytest -v
 ```
 
-51 tests: chunking unit tests, auth security unit tests, the full signup/
+55 tests: chunking unit tests, auth security unit tests, the full signup/
 login/logout flow, tenant-isolation security tests, hybrid search ranking
 (BM25 + reciprocal rank fusion), reranking and query rewriting unit tests,
 document delete, member invites/role editing/removal, RAG evaluation
-scoring, and a full upload → process → search → chat round trip against a
-real (but generated, throwaway) PDF. Tests run against `thinkdesk_test`,
-not your working database.
+scoring, document comparison, and a full upload → process → search → chat
+round trip against a real (but generated, throwaway) PDF. Tests run
+against `thinkdesk_test`, not your working database.
 
 ### 3. Frontend
 
@@ -103,14 +103,22 @@ Visit http://localhost:3000. The homepage calls the backend `/health`
 endpoint client-side and displays the live status returned by the API.
 
 The frontend talks to the backend via `NEXT_PUBLIC_API_URL` (defaults to
-`http://localhost:8000` if unset). If you ever restart the backend on a
-different port -- for instance because Windows left a stale process still
-holding port 8000 (its `SO_REUSEADDR` behavior can let a new process bind
-a port a dead-but-not-yet-reaped process still appears to own, silently
-serving stale code from whichever process the OS happens to route a
-request to) -- set `NEXT_PUBLIC_API_URL` in `frontend/.env.local` to match
-and restart `npm run dev` (Next.js only reads `NEXT_PUBLIC_*` vars at
-startup, not on hot reload).
+`http://localhost:8000` if unset; override it in `frontend/.env.local` and
+restart `npm run dev` if you ever run the backend on a different port --
+Next.js only reads `NEXT_PUBLIC_*` vars at startup, not on hot reload).
+
+**Windows gotcha with `uvicorn --reload`:** its reload mechanism spawns a
+`multiprocessing` worker subprocess. If the parent (reloader) process is
+killed directly -- rather than stopped cleanly -- the worker can be left
+running as an orphan, still bound to the port and still serving the old
+code, while `netstat`/`tasklist` show the *original* parent PID as the
+"owner" even though that PID no longer exists. Symptom: you edit a route,
+restart what you think is the server, and the new route still 404s. Fix:
+find the real culprit with
+`Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Select ProcessId,CommandLine`
+(look for `multiprocessing.spawn_main`) and kill that PID directly, not
+just the one `netstat` lists against the port. Running without `--reload`
+and restarting manually after backend changes avoids this entirely.
 
 ## Option B — Docker Compose
 

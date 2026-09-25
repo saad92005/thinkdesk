@@ -188,6 +188,31 @@ export async function removeMember(orgId: string, userId: string): Promise<void>
   if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
 }
 
+export interface ComparisonResult {
+  document_a: string;
+  document_b: string;
+  summary: string;
+  similarities: string[];
+  differences: string[];
+  contradictions: string[];
+  truncated: boolean;
+}
+
+export async function compareDocuments(
+  orgId: string,
+  documentIdA: string,
+  documentIdB: string
+): Promise<ComparisonResult> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/documents/compare`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ document_id_a: documentIdA, document_id_b: documentIdB }),
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
 export interface Citation {
   chunk_id: string;
   document_id: string;

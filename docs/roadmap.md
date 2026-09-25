@@ -37,8 +37,11 @@ Also since V1: **document deletion** (`DELETE /organizations/{id}/documents/{id}
 
 ## Phase 3 — Document Intelligence
 
-Comparison, extraction, contradiction detection, report generation. Not
-started.
+| Feature | Status |
+|---------|--------|
+| Document comparison + contradiction detection | ✅ Done — `POST /organizations/{id}/documents/compare` runs two documents' full text through the LLM and returns a grounded summary, similarities, differences, and contradictions (never invented -- an empty contradictions list is a valid, honest result); `/app/[orgId]/documents` UI to select two ready documents and see the report |
+| Structured data extraction | Not started |
+| Report generation | Not started |
 
 ## Phase 4 — Research Mode
 
@@ -69,20 +72,22 @@ provider (e.g. Stripe) account before it can be wired up for real.
 
 ---
 
-**Current focus:** Phase 2 (Advanced RAG) is now fully complete — hybrid
+**Current focus:** Phase 2 (Advanced RAG) is fully complete — hybrid
 search, reranking, query rewriting, and a RAG evaluation framework (Steps
-17–20), all tested end-to-end, including real LLM-generated answers (Groq
-`openai/gpt-oss-120b`) and real LLM-judged evaluation scores verified live
-in a real browser session — not just retrieval/citations. One known,
+17–20). Phase 3 (Document Intelligence) is underway: document comparison
+with contradiction detection is done. All of it tested end-to-end,
+including real LLM-generated answers (Groq `openai/gpt-oss-120b`), real
+LLM-judged evaluation scores, and a real LLM-generated comparison
+correctly catching a planted contradiction between two test documents --
+verified live in a real browser session, not just unit tests. One known,
 clearly-flagged gap remains: `pgvector` needs one elevated copy command to
 finish installing — see `backend/vendor/pgvector-win64/README.md`; the
 Python cosine + BM25 + reranking pipeline is correct in the meantime, just
 not indexed/scaled.
 
-Next up: Phase 3 (Document Intelligence — comparison, extraction,
-contradiction detection, report generation) is the next credential-free
-milestone. Phases 5–7 (agents with real external tools, automation on real
-external services, integrations) need credentials/accounts this session
-cannot create — those should be scoped with the project owner before
-implementation starts, per the master brief's own rule against building
-ahead of what can actually be verified.
+Next up: structured data extraction and report generation (rest of Phase
+3) are credential-free and can proceed. Phases 5–7 (agents with real
+external tools, automation on real external services, integrations) need
+credentials/accounts this session cannot create — those should be scoped
+with the project owner before implementation starts, per the master
+brief's own rule against building ahead of what can actually be verified.

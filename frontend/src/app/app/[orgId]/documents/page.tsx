@@ -2,13 +2,22 @@
 
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { FileText, Trash2, Upload } from "lucide-react";
+import { FileText, GitCompare, Trash2, Upload } from "lucide-react";
 import { OrgNav } from "@/components/org-nav";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { PageSpinner } from "@/components/ui/spinner";
-import { ApiError, deleteDocument, listDocuments, uploadDocument, type DocumentItem } from "@/lib/api";
+import { Spinner, PageSpinner } from "@/components/ui/spinner";
+import {
+  ApiError,
+  compareDocuments,
+  deleteDocument,
+  listDocuments,
+  uploadDocument,
+  type ComparisonResult,
+  type DocumentItem,
+} from "@/lib/api";
 import { useOrganization } from "@/lib/useOrganization";
 
 const STATUS_TONE: Record<DocumentItem["status"], "neutral" | "warning" | "success" | "danger"> = {
@@ -24,6 +33,23 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function ComparisonList({ title, items, empty }: { title: string; items: string[]; empty: string }) {
+  return (
+    <div>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted">{title}</h3>
+      {items.length === 0 ? (
+        <p className="mt-1 text-sm italic text-muted">{empty}</p>
+      ) : (
+        <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-foreground">
+          {items.map((item, i) => (
+            <li key={i}>{item}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default function DocumentsPage() {
   const { orgId } = useParams<{ orgId: string }>();
   const org = useOrganization(orgId);
@@ -32,6 +58,10 @@ export default function DocumentsPage() {
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [comparing, setComparing] = useState(false);
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
+  const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(() => {
@@ -76,10 +106,36 @@ export default function DocumentsPage() {
     try {
       await deleteDocument(orgId, doc.id);
       setDocuments((prev) => (prev ?? []).filter((d) => d.id !== doc.id));
+      setSelected((prev) => prev.filter((id) => id !== doc.id));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Delete failed");
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  function toggleSelected(docId: string) {
+    setComparison(null);
+    setComparisonError(null);
+    setSelected((prev) => {
+      if (prev.includes(docId)) return prev.filter((id) => id !== docId);
+      if (prev.length >= 2) return [prev[1], docId];
+      return [...prev, docId];
+    });
+  }
+
+  async function handleCompare() {
+    if (selected.length !== 2) return;
+    setComparing(true);
+    setComparisonError(null);
+    setComparison(null);
+    try {
+      const result = await compareDocuments(orgId, selected[0], selected[1]);
+      setComparison(result);
+    } catch (err) {
+      setComparisonError(err instanceof ApiError ? err.message : "Comparison failed");
+    } finally {
+      setComparing(false);
     }
   }
 
@@ -100,7 +156,9 @@ export default function DocumentsPage() {
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-6 py-10">
         <div>
           <h1 className="text-xl font-semibold text-foreground">Documents</h1>
-          <p className="mt-1 text-sm text-muted">Upload PDFs to make them searchable in Chat.</p>
+          <p className="mt-1 text-sm text-muted">
+            Upload PDFs to make them searchable in Chat. Select two ready documents to compare them.
+          </p>
         </div>
 
         <label
@@ -145,36 +203,74 @@ export default function DocumentsPage() {
             <p className="text-sm text-muted">No documents yet. Upload a PDF to start asking questions about it.</p>
           </Card>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {documents.map((doc) => (
-              <li key={doc.id}>
-                <Card className="flex items-center justify-between gap-3 p-4">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <FileText className="h-5 w-5 shrink-0 text-muted" strokeWidth={1.5} />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-foreground">{doc.filename}</p>
-                      <p className="text-xs text-muted">
-                        {formatSize(doc.size_bytes)}
-                        {doc.page_count !== null ? ` · ${doc.page_count} page(s)` : ""}
-                      </p>
-                      {doc.error_message && <p className="mt-0.5 text-xs text-red-500">{doc.error_message}</p>}
+          <>
+            <ul className="flex flex-col gap-2">
+              {documents.map((doc) => (
+                <li key={doc.id}>
+                  <Card className="flex items-center justify-between gap-3 p-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(doc.id)}
+                        onChange={() => toggleSelected(doc.id)}
+                        disabled={doc.status !== "ready"}
+                        aria-label={`Select ${doc.filename} for comparison`}
+                        className="h-4 w-4 shrink-0 accent-brand disabled:opacity-30"
+                      />
+                      <FileText className="h-5 w-5 shrink-0 text-muted" strokeWidth={1.5} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">{doc.filename}</p>
+                        <p className="text-xs text-muted">
+                          {formatSize(doc.size_bytes)}
+                          {doc.page_count !== null ? ` · ${doc.page_count} page(s)` : ""}
+                        </p>
+                        {doc.error_message && <p className="mt-0.5 text-xs text-red-500">{doc.error_message}</p>}
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-3">
-                    <Badge tone={STATUS_TONE[doc.status]}>{doc.status}</Badge>
-                    <button
-                      onClick={() => handleDelete(doc)}
-                      disabled={deletingId === doc.id}
-                      aria-label={`Delete ${doc.filename}`}
-                      className="text-muted transition-colors hover:text-red-500 disabled:opacity-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </Card>
-              </li>
-            ))}
-          </ul>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <Badge tone={STATUS_TONE[doc.status]}>{doc.status}</Badge>
+                      <button
+                        onClick={() => handleDelete(doc)}
+                        disabled={deletingId === doc.id}
+                        aria-label={`Delete ${doc.filename}`}
+                        className="text-muted transition-colors hover:text-red-500 disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </Card>
+                </li>
+              ))}
+            </ul>
+
+            {selected.length === 2 && (
+              <Button onClick={handleCompare} disabled={comparing} className="self-start">
+                {comparing ? <Spinner className="h-4 w-4" /> : <GitCompare className="h-4 w-4" />}
+                Compare selected documents
+              </Button>
+            )}
+
+            {comparisonError && <Alert>{comparisonError}</Alert>}
+
+            {comparison && (
+              <Card className="flex flex-col gap-4 p-5">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted">
+                    {comparison.document_a} vs. {comparison.document_b}
+                    {comparison.truncated && " (long documents — compared on an excerpt)"}
+                  </p>
+                  <p className="mt-1 text-sm text-foreground">{comparison.summary}</p>
+                </div>
+                <ComparisonList title="Similarities" items={comparison.similarities} empty="None noted." />
+                <ComparisonList title="Differences" items={comparison.differences} empty="None noted." />
+                <ComparisonList
+                  title="Possible contradictions"
+                  items={comparison.contradictions}
+                  empty="None found."
+                />
+              </Card>
+            )}
+          </>
         )}
       </main>
     </>

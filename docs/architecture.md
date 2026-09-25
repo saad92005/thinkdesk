@@ -160,6 +160,22 @@ self-contained, which is enough to answer "did my last retrieval/prompt
 change help or hurt," the main thing an evaluation framework needs to do
 at this stage.
 
+### Document intelligence (Phase 3: comparison)
+
+`app/intelligence/` holds Phase 3 features, starting with document
+comparison. `compare_documents()` loads each document's full chunk text
+(ordered by `chunk_index`, org-scoped the same way retrieval is), truncates
+either side that exceeds `MAX_CHARS_PER_DOCUMENT` (flagging `truncated:
+true` in the response rather than silently comparing a partial document as
+if it were complete), and sends both to the LLM with a prompt that asks
+for exactly three judgments: similarities, differences, and contradictions
+-- grounded strictly in the text given, with an explicit instruction not
+to force a contradiction entry when there isn't one. Response parsing
+mirrors the evaluation judge's approach: extract the first `{...}` block,
+and surface a clear "unavailable" error rather than a guess if it doesn't
+parse. A document that hasn't finished processing yet (no chunks) is
+rejected with a 409, not silently compared against nothing.
+
 ### Database
 
 PostgreSQL 16, native Windows install (Docker isn't available on this
