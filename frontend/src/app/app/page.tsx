@@ -18,23 +18,33 @@ export default function WorkspacesPage() {
   const [orgs, setOrgs] = useState<Organization[] | null>(null);
   const [newName, setNewName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    fetchCurrentUser().then((user) => {
-      if (cancelled) return;
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-      listOrganizations().then((data) => !cancelled && setOrgs(data));
-    });
+    setLoadError(null);
+    fetchCurrentUser()
+      .then((user) => {
+        if (cancelled) return;
+        if (!user) {
+          router.push("/login");
+          return;
+        }
+        return listOrganizations().then((data) => !cancelled && setOrgs(data));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setLoadError(
+          err instanceof ApiError ? err.message : "Could not reach the server. Check your connection and try again."
+        );
+      });
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, retryToken]);
 
   async function handleCreate(event: FormEvent) {
     event.preventDefault();
@@ -50,6 +60,23 @@ export default function WorkspacesPage() {
     } finally {
       setCreating(false);
     }
+  }
+
+  if (loadError) {
+    return (
+      <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+        <Alert>{loadError}</Alert>
+        <Button
+          onClick={() => {
+            setLoadError(null);
+            setOrgs(null);
+            setRetryToken((n) => n + 1);
+          }}
+        >
+          Try again
+        </Button>
+      </main>
+    );
   }
 
   if (orgs === null) {
