@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +14,18 @@ class Settings(BaseSettings):
     api_port: int = 8000
 
     database_url: str = "postgresql+asyncpg://thinkdesk:thinkdesk@localhost:5432/thinkdesk"
+
+    @field_validator("database_url")
+    @classmethod
+    def _use_asyncpg_driver(cls, value: str) -> str:
+        """Managed Postgres providers (Render, Railway, etc.) hand out a
+        plain postgres://... connection string with no driver in it -- fix
+        it up rather than requiring every deploy to hand-edit the URL."""
+        if value.startswith("postgres://"):
+            return "postgresql+asyncpg://" + value[len("postgres://") :]
+        if value.startswith("postgresql://"):
+            return "postgresql+asyncpg://" + value[len("postgresql://") :]
+        return value
 
     # Comma-separated list of allowed frontend origins for CORS.
     cors_origins: str = "http://localhost:3000"

@@ -116,4 +116,5 @@ thinkdesk/
 
 - [Architecture](docs/architecture.md)
 - [Setup](docs/setup.md)
+- [Deployment](docs/deployment.md) — free, public HTTPS deploy (Render + Vercel)
 - [Roadmap](docs/roadmap.md)
