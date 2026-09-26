@@ -97,10 +97,6 @@ class Settings(BaseSettings):
         """Sync driver URL for Alembic, which doesn't need asyncpg."""
         return self.database_url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
 
-    @property
-    def cookie_secure(self) -> bool:
-        return self.environment != "development"
-
 
 @lru_cache
 def get_settings() -> Settings:
