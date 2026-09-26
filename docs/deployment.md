@@ -1,106 +1,143 @@
 # Deploying ThinkDesk publicly
 
-This gets ThinkDesk reachable from anywhere at a free, real HTTPS URL —
-no credit card, no domain purchase required. A custom domain can be layered
-on top afterward (see the bottom of this doc).
+Two ways to get ThinkDesk reachable from anywhere, both free and requiring
+no credit card. Pick based on what you need:
 
-Three pieces, deployed separately, **none of which require a credit card**:
+- **[Option A: ngrok tunnel](#option-a-ngrok-tunnel-recommended-right-now)**
+  — a real public HTTPS URL in minutes, zero code deployment, zero card.
+  The trade-off: your own PC has to stay on and the servers running for the
+  link to work. This is what's actually running right now.
+- **[Option B: Render + Neon + Vercel](#option-b-independent-cloud-hosting-render--neon--vercel)**
+  — real independent cloud hosting that works even if your PC is off.
+  Slightly more setup, and Render's free web service asks for a card
+  (a refundable $1 authorization, not a charge) — worth it once you want
+  ThinkDesk reachable 24/7 regardless of your own machine.
 
-- **Database** (Postgres) → [Neon](https://neon.tech) — genuinely free
-  forever, no card, no expiry.
-- **Backend** (FastAPI) → [Render](https://render.com) — free web
-  services don't require a card either. (Render's own *managed Postgres*
-  does require one, which is why this guide uses Neon instead.)
-- **Frontend** (Next.js) → [Vercel](https://vercel.com).
+## Option A: ngrok tunnel (recommended right now)
 
-## 1. Create the database (Neon)
+This exposes your already-running local servers through one stable public
+URL. **Everything runs through a single tunnel** — the frontend serves
+the browser, and Next.js proxies anything under `/api/*` server-side to
+the FastAPI backend, so the browser never needs to reach the backend
+directly and there's no CORS to configure.
 
-1. Sign up at [neon.tech](https://neon.tech) with GitHub — no card asked.
-2. Create a project (any name, e.g. `thinkdesk`). It gives you a
-   **connection string** immediately, something like:
+### Why the frontend must run in production mode
+
+`next dev`'s hot-reload feature opens a WebSocket that ngrok's tunnel
+doesn't handle cleanly, which silently breaks React hydration on the
+public URL specifically (forms stop working, clicks fall back to native
+HTML submission). Always use a production build for anything exposed
+publicly — it's also simply what a real product should be running.
+
+### Setup
+
+1. **Add the proxy rewrite** (already done in this repo —
+   `frontend/next.config.ts` forwards `/api/:path*` to
+   `http://localhost:8000/:path*`).
+2. **Point the frontend at the proxy**, not the backend directly. In
+   `frontend/.env.local`:
    ```
-   postgresql://neondb_owner:AbC123@ep-cool-name-12345.us-east-2.aws.neon.tech/neondb?sslmode=require
+   NEXT_PUBLIC_API_URL=/api
    ```
-3. Copy that whole string — you'll paste it into Render in the next step.
-   (ThinkDesk's backend automatically adapts a plain `postgresql://` URL
-   for its async driver, so no editing needed.)
+3. **Build and start the frontend in production mode**:
+   ```
+   cd frontend
+   npm run build
+   npm run start
+   ```
+4. **Start ngrok against the frontend's port** (3000, not 8000 — the
+   backend is no longer exposed directly):
+   ```
+   ngrok http 3000
+   ```
+   A free ngrok account is tied to one stable domain that's reused across
+   restarts (e.g. `https://your-name.ngrok-free.dev`) — it doesn't change
+   randomly, so you only need to update redirect URIs once.
+5. **Point the backend's redirect URIs at that domain, through `/api`**,
+   in `backend/.env`:
+   ```
+   CORS_ORIGINS=http://localhost:3000,https://your-name.ngrok-free.dev
+   FRONTEND_BASE_URL=https://your-name.ngrok-free.dev
+   GOOGLE_REDIRECT_URI=https://your-name.ngrok-free.dev/api/connectors/google/callback
+   SLACK_REDIRECT_URI=https://your-name.ngrok-free.dev/api/connectors/slack/callback
+   ```
+   Restart the backend after editing `.env`.
+6. **Update the matching settings in each third-party dashboard** —
+   these are external services, so this step can't be automated:
+   - Google Cloud Console → your OAuth client → Authorized redirect URIs
+     → add the same `GOOGLE_REDIRECT_URI` value above
+   - Slack app (api.slack.com/apps) → OAuth & Permissions → Redirect URLs
+     → add the same `SLACK_REDIRECT_URI` value above
+   - Lemon Squeezy → Settings → Webhooks → Callback URL → set to
+     `https://your-name.ngrok-free.dev/api/billing/lemonsqueezy/webhook`
 
-## 2. Deploy the backend (Render)
+That's it — visit `https://your-name.ngrok-free.dev` from any device,
+anywhere, and the full app works: signup, upload, chat, connectors, agent
+actions, automation, billing. Verified end-to-end with a real signup →
+document upload → background processing → ready flow through the public
+URL, not just a health check.
 
-1. Sign in at [render.com](https://render.com) with your GitHub account —
-   you can create a **free Web Service** without ever being asked for a
-   card. If you're prompted for payment info at any point, you've been
-   routed into creating a *database* or a *paid* service by mistake —
-   back out and choose **New → Web Service** specifically, not Blueprint
-   or Postgres.
-2. **New → Web Service** → connect the `thinkdesk` repo.
-3. Set:
-   - **Root Directory**: `backend`
-   - **Runtime**: Python 3
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-   - **Instance Type**: Free
-4. Under **Environment**, add:
-   - `DATABASE_URL` — the Neon connection string from step 1
-   - `CONNECTOR_ENCRYPTION_KEY` — generate one locally with
-     `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
-     and paste the result
-   - `CORS_ORIGINS` and `FRONTEND_BASE_URL` — set these **after** step 3
-     below, to your Vercel URL (e.g. `https://thinkdesk.vercel.app`)
-   - Optional (the app degrades honestly if these are missing, it won't
-     crash): `GROQ_API_KEY`, `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/
-     `GOOGLE_REDIRECT_URI`, `SLACK_CLIENT_ID`/`SLACK_CLIENT_SECRET`/
-     `SLACK_REDIRECT_URI`, `LEMONSQUEEZY_*`
-5. Click **Create Web Service**. First deploy takes a few minutes (it runs
-   `alembic upgrade head` before starting the server, creating the schema
-   on Neon automatically).
-6. Note the backend's public URL, e.g. `https://thinkdesk-backend.onrender.com`.
+**Only limitation**: your PC needs to stay on, connected, and running both
+`npm run start` and `uvicorn` for the link to keep working — this is a
+tunnel to your machine, not independent hosting. Fine for a demo, a CV
+link, or showing a team; move to Option B for real 24/7 uptime.
 
-(`render.yaml` at the repo root mirrors this exact configuration — if
-Render ever offers a card-free way to deploy a Blueprint from it directly,
-that works too; the manual steps above are the guaranteed card-free path.)
+## Option B: independent cloud hosting (Render + Neon + Vercel)
 
-Free-tier note: Render's free web services spin down after 15 minutes of
-inactivity and take ~30-60 seconds to wake back up on the next request —
-expected on a free plan, not a bug. Fine for a demo/portfolio link; upgrade
-the plan before relying on it for real traffic.
+For hosting that works even when your own machine is off.
 
-## 3. Deploy the frontend (Vercel)
+### 1. Database (Neon — free forever, no card)
 
-1. Sign in at [vercel.com](https://vercel.com) with GitHub.
-2. **Add New → Project** → import the `thinkdesk` repo.
-3. Vercel will ask for the project root — set **Root Directory** to
-   `frontend` (this is a monorepo; the Next.js app isn't at the repo root).
-   It auto-detects Next.js after that, no other config needed.
-4. Add one environment variable before deploying:
-   - `NEXT_PUBLIC_API_URL` = the Render backend URL from step 2
-     (e.g. `https://thinkdesk-backend.onrender.com`)
-5. Deploy. You'll get a URL like `https://thinkdesk.vercel.app` immediately.
-6. Go back to Render and set `CORS_ORIGINS` / `FRONTEND_BASE_URL` to this
-   exact Vercel URL (step 2.4) — until you do, the browser will get CORS
-   errors and OAuth redirects will bounce to the wrong place.
+1. Sign up at [neon.tech](https://neon.tech) with GitHub.
+2. Create a project → copy the connection string it gives you
+   (`postgresql://...`). ThinkDesk's backend automatically adapts a plain
+   `postgresql://` URL for its async driver, no editing needed.
 
-## 4. Verify
+### 2. Backend (Render — free web service, asks for a refundable card hold)
 
-Visit your Vercel URL, sign up, create a workspace, upload a PDF, and ask
-a question — the full pipeline (retrieval, chat, connectors, agent,
-automation, billing) runs exactly as it does locally, against the same
-codebase, just publicly reachable now.
+1. Sign in at [render.com](https://render.com) with GitHub.
+2. **New → Web Service** (not "Blueprint", not "PostgreSQL" — those
+   provision Render's own database, which is the part that isn't free
+   without a card) → connect the `thinkdesk` repo.
+3. Set: **Root Directory** `backend`, **Build Command**
+   `pip install -r requirements.txt`, **Start Command**
+   `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT`,
+   **Instance Type** Free.
+4. Environment variables: `DATABASE_URL` (the Neon string), a generated
+   `CONNECTOR_ENCRYPTION_KEY` (`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`),
+   and — after step 3 below — `CORS_ORIGINS` / `FRONTEND_BASE_URL` set to
+   your Vercel URL. Optional: `GROQ_API_KEY`, `GOOGLE_*`, `SLACK_*`,
+   `LEMONSQUEEZY_*` (the app degrades honestly if these are missing).
+5. Create it. Note the resulting URL, e.g.
+   `https://thinkdesk-backend.onrender.com`.
 
-## Adding a real custom domain later
+(`render.yaml` at the repo root mirrors this configuration if Render ever
+offers a card-free Blueprint path.)
 
-Both platforms support this without touching code:
+Free-tier note: spins down after 15 minutes idle, ~30-60s cold start on
+the next request — expected on a free plan.
 
-- **Frontend**: Vercel project → **Settings → Domains** → add your domain
-  → it gives you a CNAME/A record to add at your registrar (Namecheap,
-  GoDaddy, etc.) → HTTPS is provisioned automatically.
-- **Backend**: Render service → **Settings → Custom Domains** → same idea.
-- Update `CORS_ORIGINS`, `FRONTEND_BASE_URL`, and the two OAuth redirect
-  URIs (Google Cloud Console, Slack app settings) to the new domain once
-  it's live — these are the only places a URL is hardcoded anywhere.
+### 3. Frontend (Vercel — free, no card)
+
+1. Sign in at [vercel.com](https://vercel.com) with GitHub → import the
+   `thinkdesk` repo → set **Root Directory** to `frontend`.
+2. Add `NEXT_PUBLIC_API_URL` = your Render backend URL (a full origin
+   this time, e.g. `https://thinkdesk-backend.onrender.com` — Option B
+   doesn't use the `/api` proxy trick since frontend and backend are on
+   genuinely separate domains here, so real CORS applies instead).
+3. Deploy. Go back to Render and set `CORS_ORIGINS` / `FRONTEND_BASE_URL`
+   to this Vercel URL.
+
+### Adding a real custom domain later
+
+Both platforms support this without touching code: Vercel project →
+**Settings → Domains**, Render service → **Settings → Custom Domains** —
+each gives you a DNS record to add at your registrar. Update
+`CORS_ORIGINS`, `FRONTEND_BASE_URL`, and the OAuth/webhook URLs to the new
+domain once it's live.
 
 ## Local development is unaffected
 
-Nothing above changes how local development works — `docs/setup.md` still
-describes running everything on `localhost`. This is purely an additional,
-optional deployment target.
+Nothing above changes local development — `docs/setup.md` still describes
+running everything on `localhost` with `next dev` and no ngrok involved.
+Both deployment options are purely additional, optional targets.
