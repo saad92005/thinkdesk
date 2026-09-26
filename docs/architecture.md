@@ -320,6 +320,26 @@ similarly isolated: one narrow function, one clear "this is where external
 state changes" comment, reachable only after an equivalent human-approval
 gate.
 
+### Automation (Phase 6): rules that only ever queue
+
+`app/automation/` is the answer this doc gave, before it was built, to the
+tension between "automation" and Phase 5's per-action approval rule: an
+`AutomationRule` can be run unattended, but *running* it only ever inserts
+a `QueuedDraft` row -- it calls the exact same `draft_email_summary()` /
+`draft_document_digest()` functions Phase 5 already built, so there is
+zero new code path to an external system. Approving a queued draft is the
+only write (`approve_queued_draft()`, which itself just calls Phase 5's
+`post_to_slack()`), gated to owner/admin like every other write in this
+codebase.
+
+Rules are triggered by a "Run now" button today, not a real clock. That's
+a deliberate scope cut, not a shortcut around the safety property: a
+background scheduler is infrastructure (which process owns it, retries,
+missed-run handling) that's orthogonal to *whether unattended automation
+can bypass human approval* -- and it can't, regardless of what triggers
+`run_rule()`. Swapping "Run now" for a real interval-based scheduler later
+means adding a caller, not changing `run_rule()` or the approval gate.
+
 ### Billing (Phase 8): Lemon Squeezy
 
 `app/billing/` follows the same "verify, don't trust" discipline as the

@@ -581,3 +581,102 @@ export async function getUsage(orgId: string): Promise<Usage> {
   if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
   return response.json();
 }
+
+export interface AutomationRule {
+  id: string;
+  name: string;
+  source: "gmail" | "document";
+  gmail_connector_id: string | null;
+  document_id: string | null;
+  slack_connector_id: string;
+  channel_id: string;
+  active: boolean;
+  last_run_at: string | null;
+}
+
+export interface QueuedDraft {
+  id: string;
+  rule_id: string;
+  rule_name: string;
+  draft_text: string;
+  source_label: string;
+  slack_connector_id: string;
+  channel_id: string;
+  status: "pending" | "approved" | "dismissed";
+  created_at: string;
+}
+
+export async function listAutomationRules(orgId: string): Promise<AutomationRule[]> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/automations`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
+export async function createAutomationRule(
+  orgId: string,
+  payload: {
+    name: string;
+    source: "gmail" | "document";
+    gmail_connector_id?: string;
+    document_id?: string;
+    slack_connector_id: string;
+    channel_id: string;
+  }
+): Promise<AutomationRule> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/automations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
+export async function deleteAutomationRule(orgId: string, ruleId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/automations/${ruleId}`, {
+    method: "DELETE",
+    credentials: "include",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+}
+
+export async function runAutomationRule(orgId: string, ruleId: string): Promise<QueuedDraft> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/automations/${ruleId}/run`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
+export async function listAutomationQueue(orgId: string): Promise<QueuedDraft[]> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/automations/queue`, {
+    credentials: "include",
+    cache: "no-store",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
+export async function approveQueuedDraft(orgId: string, draftId: string, message: string): Promise<{ posted: boolean; slack_ts: string }> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/automations/queue/${draftId}/approve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ message }),
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
+export async function dismissQueuedDraft(orgId: string, draftId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/automations/queue/${draftId}/dismiss`, {
+    method: "POST",
+    credentials: "include",
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+}

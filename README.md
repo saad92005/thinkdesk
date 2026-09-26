@@ -17,11 +17,13 @@ pieces fit together.
 **Phases 1 through 4 are all fully complete**: AI Knowledge Assistant,
 Advanced RAG, Document Intelligence, and Research Mode. **Phase 7
 (Integrations) has working Gmail, Slack, and Notion connectors**, **Phase 5
-(AI Agents) has its first real action** built on top of them, and **Phase 8
-(SaaS) has real billing wired up** — real OAuth flows and a direct-token
+(AI Agents) has two real actions** built on top of them, **Phase 6
+(Automation) has saved rules that queue those same actions for approval**,
+and **Phase 8 (SaaS) has real billing wired up** — real OAuth flows and a direct-token
 flow (Notion) sharing one connector architecture, a genuine
 propose-review-approve-execute agent loop (not a demo that skips the
-approval step), and signature-verified Lemon Squeezy checkout + webhooks
+approval step), automation rules that never skip that same step, and
+signature-verified Lemon Squeezy checkout + webhooks
 (not a fake "Upgrade" button). Signup →
 login →
 create workspace → upload a PDF → it gets extracted, chunked, and embedded
@@ -46,12 +48,15 @@ default. On top of that, ask the agent to draft a summary of your recent
 emails, or a digest of a document already in your workspace, review and
 edit it yourself, and only when you click "Approve &
 post" does it actually reach Slack — the AI never sends anything without
-that explicit human step. Subscribe to a real plan via Lemon Squeezy
+that explicit human step. Save that same drafting logic as a reusable
+automation rule, run it whenever you like (or plug in a real scheduler
+later — the code path is identical), and it still only ever queues a draft
+for you to approve, never posts on its own. Subscribe to a real plan via Lemon Squeezy
 checkout, and a workspace's billing status updates only from a
 signature-verified webhook — never guessed or set client-side. The free
 plan is capped for real (3 documents, 50 chat messages), enforced
 server-side, not just displayed — an active subscription lifts both
-automatically. Full pytest suite (100 tests) covers all of the above and —
+automatically. Full pytest suite (105 tests) covers all of the above and —
 the part that matters most for a multi-tenant app — that one
 organization's data is genuinely unreachable by another.
 

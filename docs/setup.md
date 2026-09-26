@@ -83,14 +83,15 @@ pip install -r requirements-dev.txt
 pytest -v
 ```
 
-100 tests: chunking unit tests, auth security unit tests, the full signup/
+105 tests: chunking unit tests, auth security unit tests, the full signup/
 login/logout flow, tenant-isolation security tests, hybrid search ranking
 (BM25 + reciprocal rank fusion), reranking and query rewriting unit tests,
 document delete, member invites/role editing/removal, RAG evaluation
 scoring, document comparison/extraction/report generation, research mode's
 source-verification logic, the Gmail/Slack/Notion connectors, both agent
 actions' (email-summary and document-digest) propose/approve/execute
-split, Lemon Squeezy webhook signature verification and subscription
+split, automation rules that queue those same drafts for approval, Lemon
+Squeezy webhook signature verification and subscription
 upsert logic, and
 free-plan usage limit enforcement (mostly mocked against
 Google/Slack/Lemon Squeezy, no real accounts needed in CI -- except one

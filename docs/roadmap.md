@@ -102,20 +102,37 @@ actually gets sent -- not a re-fetched or re-generated version.
 just be an early version of a future feature. See Phase 6 for what
 "automation" can honestly mean without breaking that rule.
 
-## Phase 6 — Automation
+## Phase 6 — Automation — 🚧 Started (rules that queue drafts, never auto-post)
 
-Triggers, conditions, AI processing, actions. Not started.
+`app/automation/` reconciles "automation" with Phase 5's per-action
+human-approval rule the honest way this doc flagged before it was built:
+a saved *rule* can run unattended (or be triggered manually, as it is
+today), but running a rule only ever produces a `QueuedDraft` -- it never
+posts or sends anything. A human still has to open the queue and click
+"Approve & post" on that specific draft before it reaches Slack, exactly
+like Phase 5's single actions.
 
-Worth flagging now, before it's built: "automation" (running unattended,
-e.g. on a schedule) is in real tension with Phase 5's per-action
-human-approval rule -- an unattended pipeline has no human standing by to
-click "Approve." The honest way to reconcile them, when this gets built,
-is approving a *rule* once (e.g. "always OK to draft a daily summary")
-rather than skipping approval for the resulting *actions* -- draft
-generation can run unattended, but anything Phase 5 currently gates
-(actually posting/sending) either still waits for a per-instance approval,
-or is scoped to something genuinely safe enough to pre-approve as a
-standing policy. Not deciding this by default-approving everything.
+- `AutomationRule` -- a saved recipe: a source (Gmail or a workspace
+  document), a target Slack channel, a name. Owned by a workspace.
+- `POST /organizations/{id}/automations/{rule_id}/run` -- calls the exact
+  same `draft_email_summary()` / `draft_document_digest()` functions Phase
+  5 already built, and stores the result as a `QueuedDraft` with
+  `status=pending`. This is read-only with respect to any external
+  system -- running a rule cannot post anything by itself.
+- `POST /organizations/{id}/automations/queue/{draft_id}/approve` -- the
+  only write, gated to owner/admin, calling the same `post_to_slack()`
+  used everywhere else. There is still exactly one function in the whole
+  codebase that ever posts to Slack.
+
+Rules are triggered manually from the UI today rather than by a real
+clock-driven scheduler -- deliberately: a background scheduler is orthogonal
+infrastructure (which process runs it, retry/backoff, missed-run handling)
+that doesn't change the actual safety property this phase is about. The
+same `run_rule()` a "Run now" button calls is exactly what a cron job would
+call on an interval; wiring in a real scheduler (e.g. APScheduler) later
+is additive, not a redesign. New `/app/[orgId]/automation` UI: create a
+rule, run it on demand, and approve or dismiss anything sitting in the
+queue. 5 new backend tests (105 total across the whole suite).
 
 ## Phase 7 — Integrations — 🚧 Started (Gmail + Slack + Notion connectors)
 
@@ -247,10 +264,13 @@ connectors sharing one reusable architecture across two different auth
 models, Phase 5 (AI Agents) has two real actions feeding one shared execute
 step (draft a Gmail summary, or draft a digest of a workspace document;
 either way, review it and explicitly approve before it's posted to Slack),
-and Phase 8 (SaaS) has real Lemon Squeezy billing plus enforced usage
+Phase 6 (Automation) has saved rules that run those same draft actions on
+demand and queue the result for that same human approval -- automation
+that proposes, never one that silently acts -- and Phase 8 (SaaS) has real
+Lemon Squeezy billing plus enforced usage
 limits (checkout creation, signature-verified webhook handling, and
 free-plan document/message caps that a real subscription lifts). All of it
-tested end-to-end (100 backend tests) and verified live in a real browser session,
+tested end-to-end (105 backend tests) and verified live in a real browser session,
 not just unit tests -- including a real Playwright run where the LLM
 correctly marked a claim `verified` after finding it corroborated across
 two separate uploaded documents, real redirects to Google's and Slack's
@@ -263,6 +283,6 @@ agreeing on the result). One known, clearly-flagged gap remains:
 reranking pipeline is correct in the meantime, just
 not indexed/scaled.
 
-Next up: a third agent action (e.g. summarizing a Notion page), or Phase
-6 automation (scoped honestly around the human-approval rule -- see that
-phase's notes above), following the same now-proven patterns.
+Next up: a third agent action (e.g. summarizing a Notion page), or wiring
+a real clock-driven scheduler into Phase 6's already-safe `run_rule()` so
+rules fire on their own schedule instead of only on demand.

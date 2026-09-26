@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.agents.router import router as agents_router
 from app.api.health import router as health_router
 from app.auth.router import router as auth_router
+from app.automation.router import router as automation_router
 from app.billing.router import org_router as billing_org_router
 from app.billing.router import router as billing_router
 from app.chat.router import router as chat_router
@@ -51,6 +52,7 @@ app.include_router(research_router)
 app.include_router(connectors_org_router)
 app.include_router(connectors_router)
 app.include_router(agents_router)
+app.include_router(automation_router)
 app.include_router(billing_org_router)
 app.include_router(billing_router)
 
