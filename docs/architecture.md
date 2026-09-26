@@ -287,13 +287,19 @@ already-applied ones.
 ### Agents (Phase 5): a real propose/approve/execute loop
 
 `app/agents/` builds directly on the connectors above. It's deliberately
-two separate endpoints, not one "do the thing" call, because the split
-*is* the safety mechanism:
+separate "propose" and "execute" endpoints, not one "do the thing" call,
+because the split *is* the safety mechanism. Two independent propose
+functions currently feed the same execute function:
 
 - `draft_email_summary()` (read-only) fetches Gmail messages and asks the
   LLM to summarize them. It cannot post, send, or modify anything -- there
   is no code path from this function to any external write.
-- `post_to_slack()` (the only write) takes an exact message string and a
+- `draft_document_digest()` (read-only) reuses `intelligence`'s document-
+  loading code to summarize a document already stored in this workspace's
+  own knowledge base -- same read-only guarantee, different source, proving
+  the pattern isn't specific to Gmail.
+- `post_to_slack()` (the only write, shared by both draft functions above)
+  takes an exact message string and a
   channel and posts it. It has no awareness that a "draft" ever existed --
   it posts whatever text it's handed. The only reason approved text ever
   reaches it is that the frontend puts the draft in an editable textarea

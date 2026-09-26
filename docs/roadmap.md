@@ -58,34 +58,43 @@ corroborated each claim actually is. A `gaps` list surfaces what the
 topic asks that the knowledge base doesn't actually cover. `/app/[orgId]/research`
 is the UI. 4 new backend tests (64 total).
 
-## Phase 5 — AI Agents — 🚧 Started (Gmail-to-Slack summary agent)
+## Phase 5 — AI Agents — 🚧 Started (two real actions, one execute step)
 
-`app/agents/` is the first genuine agent action: tool use (Gmail + Slack
-connectors), planning (an LLM call that turns raw emails into a draft),
-and permission-checked, human-approved execution -- the three things this
-phase's definition calls for, actually built, not stubbed.
+`app/agents/` is the first genuine agent action: tool use (Gmail, documents,
+and Slack connectors), planning (an LLM call that turns raw source material
+into a draft), and permission-checked, human-approved execution -- the
+three things this phase's definition calls for, actually built, not
+stubbed.
 
-The flow is a strict two-step propose/approve/execute loop, split across
-two separate endpoints so the "execute" step can never be reached
-accidentally:
+The flow is a strict propose/approve/execute loop, split across separate
+endpoints so the "execute" step can never be reached accidentally. Two
+independent "propose" sources currently feed the same "execute" step:
 
 1. `POST /organizations/{id}/agent/draft-email-summary` -- **read-only**.
    Fetches recent Gmail messages through the existing connector and asks
    the LLM to summarize them. Returns the draft text. Nothing is sent or
    posted anywhere; this step alone cannot have any external effect.
-2. `POST /organizations/{id}/agent/post-to-slack` -- **the only write**.
-   Takes an exact message string and posts it to a chosen Slack channel.
-   It has no concept of "the draft" -- it posts whatever text it's given,
-   which only reaches it because the UI puts that text in an editable box
-   and requires an explicit "Approve & post" click first. Gated to
-   owner/admin, unlike the read-only draft step.
+2. `POST /organizations/{id}/agent/draft-document-digest` -- **read-only**.
+   Summarizes a document already sitting in this workspace's own knowledge
+   base (reusing `intelligence`'s document-loading code) into a short,
+   Slack-postable digest -- proving the propose/approve/execute pattern
+   isn't hard-wired to Gmail specifically, any grounded source can feed it.
+3. `POST /organizations/{id}/agent/post-to-slack` -- **the only write**,
+   shared by both draft sources above. Takes an exact message string and
+   posts it to a chosen Slack channel. It has no concept of "the draft" --
+   it posts whatever text it's given, which only reaches it because the UI
+   puts that text in an editable box and requires an explicit "Approve &
+   post" click first. Gated to owner/admin, unlike the read-only draft
+   steps.
 
 `slack_oauth.py::post_message()` is the only place in the codebase that
 ever writes to Slack, and its docstring says so -- a deliberate,
 findable choke point rather than a capability sprinkled around. Slack's
-bot scope grew to `channels:read,chat:write` to support this. New
-`/app/[orgId]/agent` UI walks through both steps. 5 new backend tests (81
-total), including one asserting the exact human-edited text is what
+bot scope grew to `channels:read,chat:write` to support this. The
+`/app/[orgId]/agent` UI lets the user pick a source (Gmail or a document)
+before drafting, then walks through the same approve/post step regardless
+of source. 9 new backend tests total for this phase (100 total across the
+whole suite), including one asserting the exact human-edited text is what
 actually gets sent -- not a re-fetched or re-generated version.
 
 **Deliberately not built**: anything that runs without a human clicking
@@ -235,12 +244,13 @@ extraction, report generation), and Research Mode (topic-driven research
 across the whole knowledge base with deterministic multi-source
 verification). Phase 7 (Integrations) has working Gmail, Slack, and Notion
 connectors sharing one reusable architecture across two different auth
-models, Phase 5 (AI Agents) has its first real action (draft a Gmail
-summary, review it, explicitly approve before it's posted to Slack), and
-Phase 8 (SaaS) has real Lemon Squeezy billing plus enforced usage limits
-(checkout creation, signature-verified webhook handling, and free-plan
-document/message caps that a real subscription lifts). All of it tested
-end-to-end (98 backend tests) and verified live in a real browser session,
+models, Phase 5 (AI Agents) has two real actions feeding one shared execute
+step (draft a Gmail summary, or draft a digest of a workspace document;
+either way, review it and explicitly approve before it's posted to Slack),
+and Phase 8 (SaaS) has real Lemon Squeezy billing plus enforced usage
+limits (checkout creation, signature-verified webhook handling, and
+free-plan document/message caps that a real subscription lifts). All of it
+tested end-to-end (100 backend tests) and verified live in a real browser session,
 not just unit tests -- including a real Playwright run where the LLM
 correctly marked a claim `verified` after finding it corroborated across
 two separate uploaded documents, real redirects to Google's and Slack's
@@ -253,6 +263,6 @@ agreeing on the result). One known, clearly-flagged gap remains:
 reranking pipeline is correct in the meantime, just
 not indexed/scaled.
 
-Next up: a second agent action (e.g. summarizing a Notion page), or Phase
+Next up: a third agent action (e.g. summarizing a Notion page), or Phase
 6 automation (scoped honestly around the human-approval rule -- see that
 phase's notes above), following the same now-proven patterns.

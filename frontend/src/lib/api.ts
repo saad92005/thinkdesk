@@ -405,6 +405,23 @@ export async function draftEmailSummary(
   return response.json();
 }
 
+export interface DraftDocumentDigest {
+  draft_text: string;
+  source_document_name: string;
+  truncated: boolean;
+}
+
+export async function draftDocumentDigest(orgId: string, documentId: string): Promise<DraftDocumentDigest> {
+  const response = await fetch(`${API_BASE_URL}/organizations/${orgId}/agent/draft-document-digest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ document_id: documentId }),
+  });
+  if (!response.ok) throw new ApiError(response.status, await parseErrorDetail(response));
+  return response.json();
+}
+
 export interface PostToSlackResult {
   posted: boolean;
   channel_id: string;

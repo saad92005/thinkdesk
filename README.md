@@ -43,14 +43,15 @@ actually-computed signal. Connect Gmail and read recent messages, connect Slack 
 channels, or connect Notion (just paste an integration token, no OAuth
 needed) and see the pages you've shared with it — all read-only by
 default. On top of that, ask the agent to draft a summary of your recent
-emails, review and edit it yourself, and only when you click "Approve &
+emails, or a digest of a document already in your workspace, review and
+edit it yourself, and only when you click "Approve &
 post" does it actually reach Slack — the AI never sends anything without
 that explicit human step. Subscribe to a real plan via Lemon Squeezy
 checkout, and a workspace's billing status updates only from a
 signature-verified webhook — never guessed or set client-side. The free
 plan is capped for real (3 documents, 50 chat messages), enforced
 server-side, not just displayed — an active subscription lifts both
-automatically. Full pytest suite (98 tests) covers all of the above and —
+automatically. Full pytest suite (100 tests) covers all of the above and —
 the part that matters most for a multi-tenant app — that one
 organization's data is genuinely unreachable by another.
 

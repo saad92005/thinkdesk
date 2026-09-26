@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Bot, CheckCircle2, Mail, Send } from "lucide-react";
+import { Bot, CheckCircle2, FileText, Mail, Send } from "lucide-react";
 import { OrgNav } from "@/components/org-nav";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -12,17 +12,21 @@ import { Card } from "@/components/ui/card";
 import { PageSpinner, Spinner } from "@/components/ui/spinner";
 import {
   ApiError,
+  draftDocumentDigest,
   draftEmailSummary,
   listConnectorChannels,
   listConnectors,
+  listDocuments,
   postToSlack,
   type Connector,
+  type DocumentItem,
   type OrganizationRole,
   type SlackChannel,
 } from "@/lib/api";
 import { useOrganization } from "@/lib/useOrganization";
 
 const CAN_EXECUTE: OrganizationRole[] = ["owner", "admin"];
+type Source = "gmail" | "document";
 
 export default function AgentPage() {
   const { orgId } = useParams<{ orgId: string }>();
@@ -30,16 +34,26 @@ export default function AgentPage() {
   const [connectors, setConnectors] = useState<Connector[] | null>(null);
   const [channels, setChannels] = useState<SlackChannel[] | null>(null);
   const [selectedChannel, setSelectedChannel] = useState("");
+  const [source, setSource] = useState<Source>("gmail");
+  const [documents, setDocuments] = useState<DocumentItem[] | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState("");
 
   const [drafting, setDrafting] = useState(false);
   const [draft, setDraft] = useState("");
-  const [sourceCount, setSourceCount] = useState<number | null>(null);
+  const [sourceLabel, setSourceLabel] = useState<string | null>(null);
   const [posting, setPosting] = useState(false);
   const [posted, setPosted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     listConnectors(orgId).then(setConnectors).catch(() => {});
+    listDocuments(orgId)
+      .then((docs) => {
+        const ready = docs.filter((d) => d.status === "ready");
+        setDocuments(ready);
+        if (ready.length > 0) setSelectedDocument(ready[0].id);
+      })
+      .catch(() => {});
   }, [orgId]);
 
   const gmail = connectors?.find((c) => c.provider === "google") ?? null;
@@ -57,14 +71,21 @@ export default function AgentPage() {
   }, [orgId, slack]);
 
   async function handleDraft() {
-    if (!gmail) return;
     setError(null);
     setPosted(false);
     setDrafting(true);
     try {
-      const result = await draftEmailSummary(orgId, gmail.id);
-      setDraft(result.draft_text);
-      setSourceCount(result.source_email_count);
+      if (source === "gmail") {
+        if (!gmail) return;
+        const result = await draftEmailSummary(orgId, gmail.id);
+        setDraft(result.draft_text);
+        setSourceLabel(`${result.source_email_count} recent email(s)`);
+      } else {
+        if (!selectedDocument) return;
+        const result = await draftDocumentDigest(orgId, selectedDocument);
+        setDraft(result.draft_text);
+        setSourceLabel(`${result.source_document_name}${result.truncated ? " (truncated)" : ""}`);
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Could not draft summary");
     } finally {
@@ -104,19 +125,17 @@ export default function AgentPage() {
         <div>
           <h1 className="flex items-center gap-2 text-xl font-semibold text-foreground">
             <Bot className="h-5 w-5 text-brand" />
-            Agent: Email summary to Slack
+            Agent: draft &amp; post to Slack
           </h1>
           <p className="mt-1 text-sm text-muted">
-            Drafts a summary of your recent Gmail — nothing is sent anywhere until you review and explicitly approve
-            it below.
+            Drafts a summary from Gmail or a document already in this workspace — nothing is sent anywhere until you
+            review and explicitly approve it below.
           </p>
         </div>
 
-        {(!gmail || !slack) && (
+        {!slack && (
           <Alert tone="info">
-            This needs both a Gmail and a Slack connector. {!gmail && "Connect Gmail"}
-            {!gmail && !slack && " and "}
-            {!slack && "Connect Slack"} on the{" "}
+            This needs a Slack connector to post to. Connect Slack on the{" "}
             <Link href={`/app/${orgId}/connectors`} className="underline">
               Connectors page
             </Link>{" "}
@@ -126,12 +145,57 @@ export default function AgentPage() {
 
         {error && <Alert>{error}</Alert>}
 
-        {gmail && (
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant={source === "gmail" ? "primary" : "secondary"}
+            onClick={() => {
+              setSource("gmail");
+              setDraft("");
+              setPosted(false);
+            }}
+          >
+            <Mail className="h-4 w-4" /> From Gmail
+          </Button>
+          <Button
+            size="sm"
+            variant={source === "document" ? "primary" : "secondary"}
+            onClick={() => {
+              setSource("document");
+              setDraft("");
+              setPosted(false);
+            }}
+          >
+            <FileText className="h-4 w-4" /> From a document
+          </Button>
+        </div>
+
+        {source === "gmail" && !gmail && (
+          <Alert tone="info">
+            Connect Gmail on the{" "}
+            <Link href={`/app/${orgId}/connectors`} className="underline">
+              Connectors page
+            </Link>{" "}
+            to draft from recent email.
+          </Alert>
+        )}
+
+        {source === "document" && documents !== null && documents.length === 0 && (
+          <Alert tone="info">
+            No processed documents yet — upload one on the{" "}
+            <Link href={`/app/${orgId}/documents`} className="underline">
+              Documents page
+            </Link>{" "}
+            first.
+          </Alert>
+        )}
+
+        {((source === "gmail" && gmail) || (source === "document" && documents && documents.length > 0)) && (
           <Card className="flex flex-col gap-3 p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                <Mail className="h-4 w-4 text-muted" />
-                Step 1 — Draft from {gmail.account_label}
+                {source === "gmail" ? <Mail className="h-4 w-4 text-muted" /> : <FileText className="h-4 w-4 text-muted" />}
+                Step 1 — Draft from {source === "gmail" ? gmail!.account_label : "a document"}
               </div>
               <Button size="sm" onClick={handleDraft} disabled={drafting}>
                 {drafting ? <Spinner className="h-4 w-4" /> : null}
@@ -139,9 +203,21 @@ export default function AgentPage() {
               </Button>
             </div>
 
-            {sourceCount !== null && (
-              <p className="text-xs text-muted">Based on {sourceCount} recent email(s).</p>
+            {source === "document" && documents && (
+              <select
+                value={selectedDocument}
+                onChange={(e) => setSelectedDocument(e.target.value)}
+                className="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+              >
+                {documents.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.filename}
+                  </option>
+                ))}
+              </select>
             )}
+
+            {sourceLabel && <p className="text-xs text-muted">Based on: {sourceLabel}.</p>}
 
             {draft && (
               <textarea
@@ -157,7 +233,7 @@ export default function AgentPage() {
           </Card>
         )}
 
-        {gmail && slack && draft && (
+        {slack && draft && (
           <Card className="flex flex-col gap-3 p-4">
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
               <Send className="h-4 w-4 text-muted" />

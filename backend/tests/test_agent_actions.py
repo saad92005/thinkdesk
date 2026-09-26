@@ -1,6 +1,15 @@
 import uuid
 
 from app.connectors import google_oauth, oauth_state, slack_oauth
+from tests.pdf_fixture import make_pdf_bytes
+
+
+async def _upload(client, org_id: str, filename: str, lines: list[str]) -> str:
+    upload = await client.post(
+        f"/organizations/{org_id}/documents",
+        files={"file": (filename, make_pdf_bytes(lines), "application/pdf")},
+    )
+    return upload.json()["id"]
 
 
 async def _connect_gmail(client, org_id: str, user_id: str) -> str:
@@ -81,6 +90,31 @@ async def test_draft_with_no_emails_reports_that_honestly(client, monkeypatch):
     body = response.json()
     assert body["source_email_count"] == 0
     assert "no recent emails" in body["draft_text"].lower()
+
+
+async def test_draft_document_digest_is_grounded_in_the_real_document(client):
+    org_id, _ = await _signup_and_get_org(client, "agent6@example.com")
+    doc_id = await _upload(client, org_id, "handbook.pdf", ["Remote employees get a $500 annual home-office stipend."])
+
+    response = await client.post(
+        f"/organizations/{org_id}/agent/draft-document-digest", json={"document_id": doc_id}
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["source_document_name"] == "handbook.pdf"
+    assert body["truncated"] is False
+    assert isinstance(body["draft_text"], str) and body["draft_text"]
+
+
+async def test_draft_document_digest_for_unprocessed_document_is_rejected(client):
+    org_id, _ = await _signup_and_get_org(client, "agent7@example.com")
+
+    response = await client.post(
+        f"/organizations/{org_id}/agent/draft-document-digest", json={"document_id": str(uuid.uuid4())}
+    )
+
+    assert response.status_code == 502
 
 
 async def test_post_to_slack_requires_owner_or_admin(client, second_client):

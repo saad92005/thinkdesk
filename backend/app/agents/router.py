@@ -5,6 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents import service
 from app.agents.schemas import (
+    DraftDocumentDigestRequest,
+    DraftDocumentDigestResult,
     DraftEmailSummaryRequest,
     DraftEmailSummaryResult,
     PostToSlackRequest,
@@ -36,6 +38,22 @@ async def draft_email_summary_route(
     except service.AgentActionError as exc:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc))
     return DraftEmailSummaryResult(draft_text=draft_text, source_email_count=count)
+
+
+@router.post("/draft-document-digest", response_model=DraftDocumentDigestResult)
+async def draft_document_digest_route(
+    organization_id: uuid.UUID,
+    payload: DraftDocumentDigestRequest,
+    membership: OrganizationMember = Depends(get_organization_membership),
+    db: AsyncSession = Depends(get_db),
+) -> DraftDocumentDigestResult:
+    try:
+        draft_text, filename, truncated = await service.draft_document_digest(
+            db, organization_id, payload.document_id
+        )
+    except service.AgentActionError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc))
+    return DraftDocumentDigestResult(draft_text=draft_text, source_document_name=filename, truncated=truncated)
 
 
 @router.post("/post-to-slack", response_model=PostToSlackResult)

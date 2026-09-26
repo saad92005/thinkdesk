@@ -5,6 +5,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.llm import LLMGenerationError, LLMNotConfiguredError, get_llm_provider
 from app.connectors import google_oauth, service as connector_service, slack_oauth
 from app.connectors.crypto import ConnectorEncryptionNotConfiguredError
+from app.intelligence.service import (
+    DocumentNotFoundError,
+    DocumentNotReadyError,
+    _load_document_text,
+    _truncate,
+)
 from app.models.connector import ConnectorProvider
 
 _SUMMARY_SYSTEM_PROMPT = (
@@ -12,6 +18,13 @@ _SUMMARY_SYSTEM_PROMPT = (
     "emails, suitable to post directly in a team Slack channel. Use ONLY the "
     "emails given -- never invent a sender, subject, or detail that isn't there. "
     "Plain text, no markdown headers, under 150 words."
+)
+
+_DIGEST_SYSTEM_PROMPT = (
+    "You write a short, plain-text digest of a document, suitable to post directly "
+    "in a team Slack channel so teammates know what it covers without opening it. "
+    "Use ONLY the document text given -- never invent facts that aren't there. "
+    "No markdown headers, under 150 words."
 )
 
 
@@ -50,6 +63,33 @@ async def draft_email_summary(
         raise AgentActionError(f"Could not generate summary: {exc}") from exc
 
     return draft.strip(), len(messages)
+
+
+async def draft_document_digest(
+    db: AsyncSession, organization_id: uuid.UUID, document_id: uuid.UUID
+) -> tuple[str, str, bool]:
+    """Read-only: summarizes a document already in this workspace's knowledge
+    base into a short Slack-postable digest. Same propose half as
+    draft_email_summary, just a different source -- both end at the same
+    human-approved post_to_slack execute step."""
+    try:
+        document, text = await _load_document_text(db, organization_id, document_id)
+    except DocumentNotFoundError as exc:
+        raise AgentActionError("Document not found in this workspace") from exc
+    except DocumentNotReadyError as exc:
+        raise AgentActionError(f"'{exc}' hasn't finished processing yet") from exc
+
+    if not text.strip():
+        return "This document has no extracted text to summarize.", document.filename, False
+
+    excerpt, truncated = _truncate(text)
+    try:
+        provider = get_llm_provider()
+        draft = provider.generate(_DIGEST_SYSTEM_PROMPT, excerpt)
+    except (LLMNotConfiguredError, LLMGenerationError) as exc:
+        raise AgentActionError(f"Could not generate digest: {exc}") from exc
+
+    return draft.strip(), document.filename, truncated
 
 
 async def post_to_slack(

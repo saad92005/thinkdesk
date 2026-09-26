@@ -13,6 +13,16 @@ class DraftEmailSummaryResult(BaseModel):
     source_email_count: int
 
 
+class DraftDocumentDigestRequest(BaseModel):
+    document_id: uuid.UUID
+
+
+class DraftDocumentDigestResult(BaseModel):
+    draft_text: str
+    source_document_name: str
+    truncated: bool
+
+
 class PostToSlackRequest(BaseModel):
     slack_connector_id: uuid.UUID
     channel_id: str
