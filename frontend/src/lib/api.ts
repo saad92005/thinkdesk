@@ -1,6 +1,21 @@
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
+// Every call in this file uses the bare `fetch(...)` below instead of
+// `window.fetch` directly -- shadowing the global here means every one of
+// them picks this up automatically, with nothing to remember at each call
+// site. It exists for one reason: a free ngrok tunnel serves an HTML
+// "you are about to visit..." interstitial instead of the real API
+// response to any request that doesn't explicitly ask to skip it, which
+// silently breaks every fetch as a JSON-parse error. Harmless to send
+// against a real host (Render, etc.) that doesn't recognize the header.
+const nativeFetch = globalThis.fetch;
+function fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const headers = new Headers(init?.headers);
+  headers.set("ngrok-skip-browser-warning", "true");
+  return nativeFetch(input, { ...init, headers });
+}
+
 export interface HealthResponse {
   status: "ok" | "degraded";
   database: "connected" | "unreachable";
