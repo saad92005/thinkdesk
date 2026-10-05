@@ -168,7 +168,7 @@ export default function Home() {
         <section id="features" className="mx-auto max-w-5xl px-6 pb-20 scroll-mt-20">
           <div className="mx-auto max-w-xl text-center">
             <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">A complete AI knowledge platform</h2>
-            <p className="mt-3 text-muted">Not just "chat with your PDF" — retrieval, intelligence, agents, and automation, all grounded in your own data.</p>
+            <p className="mt-3 text-muted">Not just &ldquo;chat with your PDF&rdquo; — retrieval, intelligence, agents, and automation, all grounded in your own data.</p>
           </div>
           <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((feature) => (

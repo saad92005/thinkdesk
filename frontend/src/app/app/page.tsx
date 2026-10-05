@@ -25,7 +25,6 @@ export default function WorkspacesPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoadError(null);
     fetchCurrentUser()
       .then((user) => {
         if (cancelled) return;

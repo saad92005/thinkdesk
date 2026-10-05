@@ -71,7 +71,12 @@ export default function AutomationPage() {
         if (ready.length > 0) setSelectedDocument(ready[0].id);
       })
       .catch(() => {});
-    refresh().catch(() => {});
+    Promise.all([listAutomationRules(orgId), listAutomationQueue(orgId)])
+      .then(([rulesData, queueData]) => {
+        setRules(rulesData);
+        setQueue(queueData);
+      })
+      .catch(() => {});
   }, [orgId]);
 
   useEffect(() => {
