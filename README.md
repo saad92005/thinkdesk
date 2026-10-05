@@ -17,6 +17,14 @@ platform, built in stages. See [docs/roadmap.md](docs/roadmap.md) for the
 full plan and [docs/architecture.md](docs/architecture.md) for how the
 pieces fit together.
 
+## Screenshots
+
+**Grounded answers with citations.** One question pulls facts from two uploaded policy documents and cites the page each fact came from:
+
+![ThinkDesk chat answering a question with citations from two documents](docs/screenshots/chat-with-citations.png)
+
+![ThinkDesk landing page](docs/screenshots/landing.png)
+
 ## Architecture
 
 ```mermaid
