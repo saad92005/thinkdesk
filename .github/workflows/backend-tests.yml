@@ -42,3 +42,20 @@ jobs:
 
       - name: Run pytest
         run: pytest -v
+        env:
+          # Placeholder config so the app boots in CI. External services are
+          # mocked in tests; these values are not real credentials.
+          GOOGLE_CLIENT_ID: test-google-client
+          GOOGLE_CLIENT_SECRET: test-google-secret
+          GOOGLE_REDIRECT_URI: http://localhost:3000/connectors/google/callback
+          SLACK_CLIENT_ID: test-slack-client
+          SLACK_CLIENT_SECRET: test-slack-secret
+          SLACK_REDIRECT_URI: http://localhost:3000/connectors/slack/callback
+          CONNECTOR_ENCRYPTION_KEY: X6g3LCr3kdDEzszRkvN14NeH900zdx9CyLMR_7Bjgtk=
+          LEMONSQUEEZY_API_KEY: test-lemonsqueezy-key
+          LEMONSQUEEZY_STORE_ID: "1"
+          LEMONSQUEEZY_WEBHOOK_SECRET: test-webhook-secret
+          LEMONSQUEEZY_VARIANT_ID: "1"
+          # Tests marked live_llm run only when this repo secret is set;
+          # otherwise they are skipped (see tests/conftest.py).
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY || 'test-groq-key' }}

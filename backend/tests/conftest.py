@@ -4,6 +4,7 @@ import os
 # is cached and app.database builds its engine at import time from it.
 os.environ["DATABASE_URL"] = "postgresql+asyncpg://thinkdesk:thinkdesk@localhost:5432/thinkdesk_test"
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker
@@ -61,3 +62,22 @@ async def second_client():
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
     app.dependency_overrides.clear()
+
+
+def _has_real_groq_key() -> bool:
+    from app.core.config import get_settings
+
+    key = get_settings().groq_api_key or ""
+    return bool(key) and not key.startswith("test-")
+
+
+def pytest_collection_modifyitems(config, items):
+    # Tests marked live_llm make real Groq calls (they check that answers are
+    # grounded in the uploaded documents). Without a real key -- e.g. in CI
+    # when the GROQ_API_KEY secret isn't set -- skip them instead of failing.
+    if _has_real_groq_key():
+        return
+    skip = pytest.mark.skip(reason="needs a real GROQ_API_KEY (live LLM test)")
+    for item in items:
+        if "live_llm" in item.keywords:
+            item.add_marker(skip)

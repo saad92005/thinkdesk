@@ -1,3 +1,4 @@
+import pytest
 from tests.pdf_fixture import make_pdf_bytes
 
 
@@ -9,6 +10,7 @@ async def _upload(client, org_id: str, filename: str, lines: list[str]) -> str:
     return upload.json()["id"]
 
 
+@pytest.mark.live_llm
 async def test_compare_two_documents_returns_grounded_structured_result(client):
     await client.post("/auth/signup", json={"email": "compare1@example.com", "password": "correcthorse123"})
     org_id = (await client.get("/organizations")).json()[0]["id"]
@@ -56,6 +58,7 @@ async def test_compare_nonexistent_document_returns_404(client):
     assert response.status_code == 404
 
 
+@pytest.mark.live_llm
 async def test_extract_key_information_from_a_document(client):
     await client.post("/auth/signup", json={"email": "extract1@example.com", "password": "correcthorse123"})
     org_id = (await client.get("/organizations")).json()[0]["id"]
@@ -86,6 +89,7 @@ async def test_extract_from_nonexistent_document_returns_404(client):
     assert response.status_code == 404
 
 
+@pytest.mark.live_llm
 async def test_generate_report_across_multiple_documents(client):
     await client.post("/auth/signup", json={"email": "report1@example.com", "password": "correcthorse123"})
     org_id = (await client.get("/organizations")).json()[0]["id"]

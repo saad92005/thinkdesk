@@ -1,3 +1,4 @@
+import pytest
 from tests.pdf_fixture import make_pdf_bytes
 
 
@@ -18,6 +19,7 @@ async def _create_org_with_policy_doc(client, email: str) -> str:
     return org_id
 
 
+@pytest.mark.live_llm
 async def test_evaluation_run_scores_a_hit_and_a_miss_case(client):
     org_id = await _create_org_with_policy_doc(client, "evaluser@example.com")
 

@@ -1,3 +1,4 @@
+import pytest
 import uuid
 
 from app.connectors import google_oauth, oauth_state, slack_oauth
@@ -32,6 +33,7 @@ async def _signup_and_get_org(client, email: str) -> tuple[str, str]:
     return org_id, user["id"]
 
 
+@pytest.mark.live_llm
 async def test_document_automation_rule_runs_and_queues_a_draft(client):
     org_id, user_id = await _signup_and_get_org(client, "automation1@example.com")
     slack_id = await _connect_slack(client, org_id, user_id)
@@ -62,6 +64,7 @@ async def test_document_automation_rule_runs_and_queues_a_draft(client):
     assert len(queue.json()) == 1
 
 
+@pytest.mark.live_llm
 async def test_approving_a_queued_draft_posts_exactly_that_text(client, monkeypatch):
     org_id, user_id = await _signup_and_get_org(client, "automation2@example.com")
     slack_id = await _connect_slack(client, org_id, user_id)
@@ -95,6 +98,7 @@ async def test_approving_a_queued_draft_posts_exactly_that_text(client, monkeypa
     assert queue.json() == []
 
 
+@pytest.mark.live_llm
 async def test_approving_requires_owner_or_admin(client, second_client):
     org_id, owner_id = await _signup_and_get_org(client, "automation3@example.com")
     slack_id = await _connect_slack(client, org_id, owner_id)
@@ -117,6 +121,7 @@ async def test_approving_requires_owner_or_admin(client, second_client):
     assert response.status_code == 403
 
 
+@pytest.mark.live_llm
 async def test_dismissing_a_queued_draft_removes_it_from_the_queue(client):
     org_id, user_id = await _signup_and_get_org(client, "automation4@example.com")
     slack_id = await _connect_slack(client, org_id, user_id)

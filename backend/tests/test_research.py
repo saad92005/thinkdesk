@@ -1,3 +1,4 @@
+import pytest
 from tests.pdf_fixture import make_pdf_bytes
 
 
@@ -9,6 +10,7 @@ async def _upload(client, org_id: str, filename: str, lines: list[str]) -> str:
     return upload.json()["id"]
 
 
+@pytest.mark.live_llm
 async def test_research_finds_a_verified_finding_corroborated_by_two_documents(client):
     await client.post("/auth/signup", json={"email": "research1@example.com", "password": "correcthorse123"})
     org_id = (await client.get("/organizations")).json()[0]["id"]

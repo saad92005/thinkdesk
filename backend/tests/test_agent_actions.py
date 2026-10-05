@@ -1,3 +1,4 @@
+import pytest
 import uuid
 
 from app.connectors import google_oauth, oauth_state, slack_oauth
@@ -51,6 +52,7 @@ async def _signup_and_get_org(client, email: str) -> tuple[str, str]:
     return org_id, user["id"]
 
 
+@pytest.mark.live_llm
 async def test_draft_email_summary_is_grounded_in_real_emails(client, monkeypatch):
     org_id, user_id = await _signup_and_get_org(client, "agent1@example.com")
     gmail_id = await _connect_gmail(client, org_id, user_id)
@@ -92,6 +94,7 @@ async def test_draft_with_no_emails_reports_that_honestly(client, monkeypatch):
     assert "no recent emails" in body["draft_text"].lower()
 
 
+@pytest.mark.live_llm
 async def test_draft_document_digest_is_grounded_in_the_real_document(client):
     org_id, _ = await _signup_and_get_org(client, "agent6@example.com")
     doc_id = await _upload(client, org_id, "handbook.pdf", ["Remote employees get a $500 annual home-office stipend."])
