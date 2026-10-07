@@ -1,19 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Lets one public tunnel (e.g. ngrok) front both the frontend and the
-  // backend: the browser only ever talks to this same origin, and Next's
-  // own server forwards anything under /api to the FastAPI backend
-  // running locally. Only takes effect when NEXT_PUBLIC_API_URL is set to
-  // a relative path (e.g. "/api") -- see docs/deployment.md.
-  async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: "http://localhost:8000/:path*",
-      },
-    ];
-  },
+  // /api/* is handled by src/app/api/[...path]/route.ts, a route handler
+  // that proxies to the real backend server-side. A route handler (rather
+  // than a plain `rewrites()` entry) is used because it can inject the
+  // ngrok-skip-browser-warning header on the outgoing request and forward
+  // Set-Cookie correctly -- a bare rewrite can't add request headers.
 };
 
 export default nextConfig;
